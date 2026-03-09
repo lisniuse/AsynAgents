@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '@/stores/appStore';
-import { SearchIcon, TrashIcon } from '@/components/icons';
+import { SearchIcon, TrashIcon, MessageIcon } from '@/components/icons';
 import { useT } from '@/i18n';
 import './ConversationsManager.less';
 
@@ -11,7 +11,7 @@ interface Props {
 
 export const ConversationsManager: React.FC<Props> = ({ onClose }) => {
   const t = useT();
-  const { conversations, deleteConversations } = useAppStore();
+  const { conversations, deleteConversations, setActiveConversation } = useAppStore();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
@@ -106,11 +106,20 @@ export const ConversationsManager: React.FC<Props> = ({ onClose }) => {
               <div
                 key={conv.id}
                 className={`mgr-item ${selected.has(conv.id) ? 'selected' : ''}`}
-                onClick={() => toggleOne(conv.id)}
               >
-                <span className={`mgr-checkbox ${selected.has(conv.id) ? 'checked' : ''}`} />
-                <div className="mgr-item-info">
-                  <div className="mgr-item-name">{conv.name}</div>
+                <span
+                  className={`mgr-checkbox ${selected.has(conv.id) ? 'checked' : ''}`}
+                  onClick={() => toggleOne(conv.id)}
+                />
+                <div
+                  className="mgr-item-info"
+                  onClick={() => { setActiveConversation(conv.id); onClose(); }}
+                  title="打开此会话"
+                >
+                  <div className="mgr-item-name">
+                    <MessageIcon size={13} className="mgr-item-icon" />
+                    {conv.name}
+                  </div>
                   <div className="mgr-item-date">{formatDate(conv.updatedAt)}</div>
                 </div>
               </div>
