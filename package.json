@@ -2,6 +2,8 @@
   "name": "asyn-agents",
   "version": "1.0.0",
   "description": "AI Agent HTTP service with real-time streaming communication",
+  "author": "lisniuse",
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev:server": "cd server && npm run dev",
