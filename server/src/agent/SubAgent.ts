@@ -15,7 +15,10 @@ const MAX_ITERATIONS = 20;
 
 // Load skills once at module level (sync reads at startup)
 const skills = loadSkills();
-const systemPrompt = buildSystemPrompt(buildSkillsPrompt(skills));
+const systemPrompt = buildSystemPrompt(
+  buildSkillsPrompt(skills),
+  config.ui?.userLanguage ?? 'auto'
+);
 
 function createProvider(history: SimpleMsg[], userMessage: string): LLMProvider {
   if (config.provider === 'openai') {

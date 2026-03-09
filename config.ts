@@ -31,6 +31,8 @@ export interface Config {
   };
   ui: {
     showToolCalls: boolean;
+    language: 'zh' | 'en';
+    userLanguage: 'zh' | 'en' | 'auto';
   };
 }
 
@@ -63,6 +65,8 @@ const defaultConfig: Config = {
   },
   ui: {
     showToolCalls: true,
+    language: 'zh',
+    userLanguage: 'auto',
   },
 };
 

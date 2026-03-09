@@ -3,18 +3,11 @@ import { useAppStore } from '@/stores/appStore';
 import { useSSE } from '@/hooks/useSSE';
 import { MessageItem } from './MessageItem';
 import { SendIcon } from '@/components/icons';
+import { useT } from '@/i18n';
 import './ChatView.less';
 
-const WELCOME_PROMPTS = [
-  { emoji: '🐍', text: '写一个 Python 的 Hello World 并运行它' },
-  { emoji: '🌐', text: '用 Node.js 创建一个简单的 HTTP 服务器' },
-  { emoji: '📂', text: '查看当前目录的文件结构并说明用途' },
-  { emoji: '🔢', text: '帮我写一个 Fibonacci 数列计算器并测试' },
-  { emoji: '💻', text: '查看系统信息（操作系统、内存、CPU 等）' },
-  { emoji: '📝', text: '用 bash 写一个文件批量重命名脚本' },
-];
-
 export const ChatView: React.FC = () => {
+  const t = useT();
   const { activeConversationId, conversations, createConversation } = useAppStore();
   const { sendMessage, stopCurrentAgent } = useSSE();
   const [inputValue, setInputValue] = useState('');
@@ -87,7 +80,7 @@ export const ChatView: React.FC = () => {
             autoResize(e.target);
           }}
           onKeyDown={handleKeyDown}
-          placeholder="描述你想完成的任务... (Shift+Enter 换行，Enter 发送)"
+          placeholder={t.inputPlaceholder}
           rows={isWelcome ? 3 : 1}
         />
         <button
@@ -99,7 +92,7 @@ export const ChatView: React.FC = () => {
           <SendIcon size={16} />
         </button>
       </div>
-      <div className="input-hint">AI 智能体可以执行命令和修改文件，请确认操作安全</div>
+      <div className="input-hint">{t.inputHint}</div>
     </div>
   );
 
@@ -112,13 +105,11 @@ export const ChatView: React.FC = () => {
           </div>
           <div>
             <h1>Asyn Agents</h1>
-            <p style={{ marginTop: 10 }}>
-              AI 智能体系统 · 每次对话创建独立线程 · 可执行代码、读写文件、安装包
-            </p>
+            <p style={{ marginTop: 10 }}>{t.welcomeSubtitle}</p>
           </div>
           <div className="welcome-input-area">{inputBox}</div>
           <div className="welcome-chips">
-            {WELCOME_PROMPTS.map((prompt, i) => (
+            {t.welcomePrompts.map((prompt, i) => (
               <div key={i} className="chip" onClick={() => handlePromptClick(prompt.text)}>
                 {prompt.emoji} {prompt.text}
               </div>

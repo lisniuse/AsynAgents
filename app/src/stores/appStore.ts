@@ -21,6 +21,9 @@ interface AppState {
   loadSettings: () => Promise<void>;
   saveSettings: (patch: Partial<AppSettings>) => Promise<void>;
 
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: (v: boolean) => void;
+
   conversations: Conversation[];
   activeConversationId: string | null;
   runningAgents: Map<string, AgentState>;
@@ -66,6 +69,8 @@ export const useAppStore = create<AppState>()(
     },
 
     settings: null,
+    sidebarCollapsed: false,
+    setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
 
     loadSettings: async () => {
       try {

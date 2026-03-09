@@ -91,9 +91,21 @@ Guidelines:
 4. Be concise in your final answer
 5. Keep working until the task is FULLY completed`;
 
-/** Build the full system prompt, optionally appending skills content. */
-export function buildSystemPrompt(skillsSection?: string): string {
-  return skillsSection ? BASE_SYSTEM_PROMPT + skillsSection : BASE_SYSTEM_PROMPT;
+function buildUserLanguageSection(userLanguage: string): string {
+  if (userLanguage === 'zh') {
+    return '\n\n## Response Language\nAlways respond to the user in **Chinese (中文)**, regardless of the language they write in.';
+  }
+  if (userLanguage === 'en') {
+    return '\n\n## Response Language\nAlways respond to the user in **English**, regardless of the language they write in.';
+  }
+  // 'auto' or unknown: no constraint
+  return '';
+}
+
+/** Build the full system prompt, optionally appending skills and user language preference. */
+export function buildSystemPrompt(skillsSection?: string, userLanguage?: string): string {
+  const langSection = userLanguage ? buildUserLanguageSection(userLanguage) : '';
+  return BASE_SYSTEM_PROMPT + langSection + (skillsSection ?? '');
 }
 
 /** @deprecated Use buildSystemPrompt() instead */

@@ -5,6 +5,7 @@ import { ToolCard } from './ToolCard';
 import type { Message } from '@/types';
 import { BoltIcon, BrainIcon, ChevronDownIcon, ChevronUpIcon, StopIcon } from '@/components/icons';
 import { useAppStore } from '@/stores/appStore';
+import { useT } from '@/i18n';
 import './MessageItem.less';
 
 interface MessageItemProps {
@@ -39,6 +40,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   onStop,
   isStopping = false
 }) => {
+  const t = useT();
   const contentRef = useRef<HTMLDivElement>(null);
   const settings = useAppStore((s) => s.settings);
   const defaultExpanded = settings?.ui?.showToolCalls ?? true;
@@ -68,7 +70,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           <BoltIcon size={16} />
         </div>
         <div className="msg-content">
-          <div className="msg-label">ASSISTANT</div>
+          <div className="msg-label">{t.assistant}</div>
 
           {/* 工具调用折叠区域 */}
           {message.toolCalls && message.toolCalls.length > 0 && (
@@ -76,10 +78,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               <button
                 className="thinking-toggle"
                 onClick={() => setIsToolCallsExpanded(!isToolCallsExpanded)}
-                title={isToolCallsExpanded ? '收起工具调用过程' : '展开工具调用过程'}
+                title={isToolCallsExpanded ? t.collapseToolCalls : t.expandToolCalls}
               >
                 <BrainIcon size={14} />
-                <span>工具调用过程</span>
+                <span>{t.toolCallProcess}</span>
                 {isToolCallsExpanded ? <ChevronUpIcon size={14} /> : <ChevronDownIcon size={14} />}
               </button>
               {isToolCallsExpanded && (
@@ -113,10 +115,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               className="stop-btn"
               onClick={onStop}
               disabled={isStopping}
-              title="停止生成"
+              title={t.stop}
             >
               <StopIcon size={14} />
-              <span>{isStopping ? '停止中...' : '停止'}</span>
+              <span>{isStopping ? t.stopping : t.stop}</span>
             </button>
           )}
         </div>
