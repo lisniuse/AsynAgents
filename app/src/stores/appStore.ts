@@ -31,6 +31,7 @@ interface AppState {
   loadConversations: () => Promise<void>;
   createConversation: () => Promise<string>;
   deleteConversation: (id: string) => void;
+  deleteConversations: (ids: string[]) => void;
   setActiveConversation: (id: string | null) => void;
   updateConversationName: (id: string, name: string) => void;
 
@@ -154,10 +155,21 @@ export const useAppStore = create<AppState>()(
           state.activeConversationId === id
             ? newConversations[0]?.id ?? null
             : state.activeConversationId;
-        return {
-          conversations: newConversations,
-          activeConversationId: newActiveId,
-        };
+        return { conversations: newConversations, activeConversationId: newActiveId };
+      });
+    },
+
+    deleteConversations: (ids) => {
+      const idSet = new Set(ids);
+      ids.forEach((id) =>
+        fetch(`${API_BASE}/conversations/${id}`, { method: 'DELETE' }).catch(console.error)
+      );
+      set((state) => {
+        const newConversations = state.conversations.filter((c) => !idSet.has(c.id));
+        const newActiveId = idSet.has(state.activeConversationId ?? '')
+          ? newConversations[0]?.id ?? null
+          : state.activeConversationId;
+        return { conversations: newConversations, activeConversationId: newActiveId };
       });
     },
 

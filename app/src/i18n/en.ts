@@ -33,6 +33,16 @@ export default {
     { emoji: '📝', text: 'Write a bash script to batch rename files' },
   ],
 
+  // Manage conversations
+  manageHistory: 'Manage Chats',
+  searchConversations: 'Search conversations...',
+  selectAll: 'Select all',
+  deselectAll: 'Deselect all',
+  deleteSelected: 'Delete selected',
+  selectedCount: (n: number) => `${n} selected`,
+  noSearchResults: 'No matching conversations',
+  confirmBatchDelete: (n: number) => `Delete ${n} selected conversation${n > 1 ? 's' : ''}?`,
+
   // Theme
   themeLight: 'Light',
   themeDark: 'Dark',

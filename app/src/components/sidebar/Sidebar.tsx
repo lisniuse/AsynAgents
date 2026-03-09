@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '@/stores/appStore';
-import { PlusIcon, MessageIcon, TrashIcon, BoltIcon, SettingsIcon, PanelLeftIcon } from '@/components/icons';
+import { PlusIcon, MessageIcon, TrashIcon, BoltIcon, SettingsIcon, PanelLeftIcon, ListManageIcon } from '@/components/icons';
 import { ThemeToggle } from './ThemeToggle';
 import { SettingsModal } from '@/components/settings';
+import { ConversationsManager } from './ConversationsManager';
 import { useT } from '@/i18n';
 import './Sidebar.less';
 
@@ -38,6 +39,7 @@ export const Sidebar: React.FC = () => {
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; right: number } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showManager, setShowManager] = useState(false);
 
   useEffect(() => {
     if (!confirmId) return;
@@ -88,7 +90,18 @@ export const Sidebar: React.FC = () => {
             {t.newChat}
           </button>
 
-          <div className="sidebar-section-label">{t.history}</div>
+          <div className="sidebar-section-row">
+            <span className="sidebar-section-label">{t.history}</span>
+            {conversations.length > 0 && (
+              <button
+                className="section-manage-btn"
+                onClick={() => setShowManager(true)}
+                title={t.manageHistory}
+              >
+                <ListManageIcon size={13} />
+              </button>
+            )}
+          </div>
 
           <div className="conv-list">
             {conversations.length === 0 ? (
@@ -146,6 +159,7 @@ export const Sidebar: React.FC = () => {
       )}
 
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showManager && <ConversationsManager onClose={() => setShowManager(false)} />}
     </div>
   );
 };

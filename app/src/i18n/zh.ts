@@ -33,6 +33,16 @@ export default {
     { emoji: '📝', text: '用 bash 写一个文件批量重命名脚本' },
   ],
 
+  // Manage conversations
+  manageHistory: '管理会话',
+  searchConversations: '搜索会话...',
+  selectAll: '全选',
+  deselectAll: '取消全选',
+  deleteSelected: '删除所选',
+  selectedCount: (n: number) => `已选 ${n} 项`,
+  noSearchResults: '未找到匹配的会话',
+  confirmBatchDelete: (n: number) => `确定删除选中的 ${n} 条会话？`,
+
   // Theme
   themeLight: '浅色模式',
   themeDark: '深色模式',
