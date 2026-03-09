@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/appStore';
 import { SearchIcon, TrashIcon, MessageIcon } from '@/components/icons';
 import { useT } from '@/i18n';
@@ -11,6 +12,7 @@ interface Props {
 
 export const ConversationsManager: React.FC<Props> = ({ onClose }) => {
   const t = useT();
+  const navigate = useNavigate();
   const { conversations, deleteConversations, setActiveConversation } = useAppStore();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -113,7 +115,7 @@ export const ConversationsManager: React.FC<Props> = ({ onClose }) => {
                 />
                 <div
                   className="mgr-item-info"
-                  onClick={() => { setActiveConversation(conv.id); onClose(); }}
+                  onClick={() => { setActiveConversation(conv.id); navigate(`/c/${conv.id}`); onClose(); }}
                   title="打开此会话"
                 >
                   <div className="mgr-item-name">

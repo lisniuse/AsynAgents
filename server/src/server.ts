@@ -38,6 +38,12 @@ app.use('/api', eventsRouter);
 app.use('/api', conversationsRouter);
 app.use('/api', configRouter);
 
+// SPA fallback — serve index.html for all non-API routes
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/health')) return next();
+  res.sendFile(join(__dirname, '../public', 'index.html'));
+});
+
 app.get('/health', (_req, res) => {
   const validation = validateConfig();
   res.json({

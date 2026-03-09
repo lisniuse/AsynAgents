@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/appStore';
 import { PlusIcon, MessageIcon, TrashIcon, BoltIcon, SettingsIcon, PanelLeftIcon, ListManageIcon } from '@/components/icons';
 import { ThemeToggle } from './ThemeToggle';
@@ -26,6 +27,7 @@ const formatTime = (timestamp: number, t: ReturnType<typeof useT>): string => {
 
 export const Sidebar: React.FC = () => {
   const t = useT();
+  const navigate = useNavigate();
   const {
     conversations,
     activeConversationId,
@@ -35,6 +37,16 @@ export const Sidebar: React.FC = () => {
     sidebarCollapsed,
     setSidebarCollapsed,
   } = useAppStore();
+
+  const handleNewChat = async () => {
+    const id = await createConversation();
+    navigate(`/c/${id}`);
+  };
+
+  const handleSelectConversation = (id: string) => {
+    setActiveConversation(id);
+    navigate(`/c/${id}`);
+  };
 
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; right: number } | null>(null);
@@ -85,7 +97,7 @@ export const Sidebar: React.FC = () => {
 
       {!sidebarCollapsed && (
         <>
-          <button className="new-chat-btn" onClick={() => createConversation()}>
+          <button className="new-chat-btn" onClick={handleNewChat}>
             <PlusIcon size={14} />
             {t.newChat}
           </button>
@@ -111,7 +123,7 @@ export const Sidebar: React.FC = () => {
                 <div
                   key={conv.id}
                   className={`conv-item ${activeConversationId === conv.id ? 'active' : ''}`}
-                  onClick={() => setActiveConversation(conv.id)}
+                  onClick={() => handleSelectConversation(conv.id)}
                 >
                   <MessageIcon size={18} className="conv-item-icon" />
                   <div className="conv-item-content">

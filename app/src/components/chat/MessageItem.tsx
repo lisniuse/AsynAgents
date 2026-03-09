@@ -44,7 +44,14 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const contentRef = useRef<HTMLDivElement>(null);
   const settings = useAppStore((s) => s.settings);
   const defaultExpanded = settings?.ui?.showToolCalls ?? true;
-  const [isToolCallsExpanded, setIsToolCallsExpanded] = useState(defaultExpanded);
+
+  // null = 用户未手动切换，跟随设置；非 null = 用户手动覆盖
+  const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
+  const isToolCallsExpanded = manualExpanded !== null ? manualExpanded : defaultExpanded;
+
+  const handleToggle = () => {
+    setManualExpanded(!isToolCallsExpanded);
+  };
 
   useEffect(() => {
     if (contentRef.current) {
@@ -77,7 +84,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             <div className="thinking-section">
               <button
                 className="thinking-toggle"
-                onClick={() => setIsToolCallsExpanded(!isToolCallsExpanded)}
+                onClick={handleToggle}
                 title={isToolCallsExpanded ? t.collapseToolCalls : t.expandToolCalls}
               >
                 <BrainIcon size={14} />

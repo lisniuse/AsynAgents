@@ -1,10 +1,12 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/appStore';
 import type { SSEEvent, ToolCallData, ToolResultData } from '@/types';
 
 const API_BASE = '/api';
 
 export const useSSE = () => {
+  const navigate = useNavigate();
   const eventSourceRef = useRef<EventSource | null>(null);
   const sessionIdRef = useRef<string>(generateSessionId());
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -196,6 +198,7 @@ export const useSSE = () => {
       
       if (!conversationId) {
         conversationId = await useAppStore.getState().createConversation();
+        navigate(`/c/${conversationId}`);
       }
 
       const userMsgId = 'msg_' + Math.random().toString(36).substring(2, 15);
