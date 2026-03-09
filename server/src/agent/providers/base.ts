@@ -33,6 +33,37 @@ export interface LLMProvider {
   ): void;
 }
 
+function buildOsSection(): string {
+  const platform = process.platform;
+  const arch = process.arch;
+
+  if (platform === 'win32') {
+    return `
+## Runtime Environment
+- OS: Windows (${arch})
+- Preferred shell: **PowerShell** (use \`powershell -Command "..."\` or plain PowerShell syntax)
+- Fallback shell: cmd.exe (use only when PowerShell is unavailable)
+- Do NOT use Unix-only commands (ls, grep, cat, etc.) — use PowerShell equivalents (Get-ChildItem, Select-String, Get-Content, etc.)
+- Path separator: backslash (\`\\\`)`;
+  }
+
+  if (platform === 'darwin') {
+    return `
+## Runtime Environment
+- OS: macOS (${arch})
+- Preferred shell: **bash** or **zsh**
+- Use standard Unix commands freely (ls, grep, cat, find, etc.)
+- Path separator: forward slash (\`/\`)`;
+  }
+
+  return `
+## Runtime Environment
+- OS: Linux (${arch})
+- Preferred shell: **bash**
+- Use standard Unix commands freely (ls, grep, cat, find, etc.)
+- Path separator: forward slash (\`/\`)`;
+}
+
 const BASE_SYSTEM_PROMPT = `You are a powerful AI sub-agent with full system access. You can run shell commands, write and read files, install packages, execute code in any language, and solve complex problems.
 
 Available tools:
@@ -40,6 +71,7 @@ Available tools:
 - write_file: Create or overwrite a file
 - read_file: Read file contents
 - list_directory: List directory contents
+${buildOsSection()}
 
 IMPORTANT: You must separate your thinking process from your final answer using the following format:
 <thinking>

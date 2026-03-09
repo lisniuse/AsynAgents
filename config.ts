@@ -29,6 +29,9 @@ export interface Config {
     maxFiles: number;
     maxSize: string;
   };
+  ui: {
+    showToolCalls: boolean;
+  };
 }
 
 export const CONFIG_DIR = join(homedir(), '.asynagents');
@@ -58,6 +61,9 @@ const defaultConfig: Config = {
     maxFiles: 5,
     maxSize: '10m',
   },
+  ui: {
+    showToolCalls: true,
+  },
 };
 
 function loadConfig(): Config {
@@ -81,6 +87,7 @@ function loadConfig(): Config {
       server: { ...defaultConfig.server, ...userConfig.server },
       app: { ...defaultConfig.app, ...userConfig.app },
       logging: { ...defaultConfig.logging, ...userConfig.logging },
+      ui: { ...defaultConfig.ui, ...userConfig.ui },
     };
   } catch {
     return { ...defaultConfig };

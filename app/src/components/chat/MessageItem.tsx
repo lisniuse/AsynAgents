@@ -4,6 +4,7 @@ import hljs from 'highlight.js';
 import { ToolCard } from './ToolCard';
 import type { Message } from '@/types';
 import { BoltIcon, BrainIcon, ChevronDownIcon, ChevronUpIcon, StopIcon } from '@/components/icons';
+import { useAppStore } from '@/stores/appStore';
 import './MessageItem.less';
 
 interface MessageItemProps {
@@ -33,13 +34,15 @@ const renderMarkdown = (content: string): string => {
   }).join('');
 };
 
-export const MessageItem: React.FC<MessageItemProps> = ({ 
-  message, 
+export const MessageItem: React.FC<MessageItemProps> = ({
+  message,
   onStop,
-  isStopping = false 
+  isStopping = false
 }) => {
   const contentRef = useRef<HTMLDivElement>(null);
-  const [isToolCallsExpanded, setIsToolCallsExpanded] = useState(true);
+  const settings = useAppStore((s) => s.settings);
+  const defaultExpanded = settings?.ui?.showToolCalls ?? true;
+  const [isToolCallsExpanded, setIsToolCallsExpanded] = useState(defaultExpanded);
 
   useEffect(() => {
     if (contentRef.current) {
@@ -73,10 +76,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               <button
                 className="thinking-toggle"
                 onClick={() => setIsToolCallsExpanded(!isToolCallsExpanded)}
-                title={isToolCallsExpanded ? '收起工具调用' : '展开工具调用'}
+                title={isToolCallsExpanded ? '收起工具调用过程' : '展开工具调用过程'}
               >
                 <BrainIcon size={14} />
-                <span>思考过程</span>
+                <span>工具调用过程</span>
                 {isToolCallsExpanded ? <ChevronUpIcon size={14} /> : <ChevronDownIcon size={14} />}
               </button>
               {isToolCallsExpanded && (

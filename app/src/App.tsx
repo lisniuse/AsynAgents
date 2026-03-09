@@ -6,9 +6,11 @@ import './App.less';
 
 const App: React.FC = () => {
   const loadConversations = useAppStore((s) => s.loadConversations);
+  const loadSettings = useAppStore((s) => s.loadSettings);
 
   useEffect(() => {
     loadConversations();
+    loadSettings();
   }, []);
 
   return (

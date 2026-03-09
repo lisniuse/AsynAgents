@@ -5,6 +5,7 @@ import { dirname, join } from 'path';
 import chatRouter from './routes/chat.js';
 import eventsRouter from './routes/events.js';
 import conversationsRouter from './routes/conversations.js';
+import configRouter from './routes/config.js';
 import { config, activeModel, validateConfig, workspaceDir, CONFIG_PATH } from '../../config.js';
 import { logger, log } from './utils/logger.js';
 import { loadSkills } from './skills/SkillLoader.js';
@@ -35,6 +36,7 @@ app.use(express.static(join(__dirname, '../public')));
 app.use('/api', chatRouter);
 app.use('/api', eventsRouter);
 app.use('/api', conversationsRouter);
+app.use('/api', configRouter);
 
 app.get('/health', (_req, res) => {
   const validation = validateConfig();

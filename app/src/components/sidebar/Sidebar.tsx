@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '@/stores/appStore';
-import { PlusIcon, MessageIcon, TrashIcon, BoltIcon } from '@/components/icons';
+import { PlusIcon, MessageIcon, TrashIcon, BoltIcon, SettingsIcon } from '@/components/icons';
 import { ThemeToggle } from './ThemeToggle';
+import { SettingsModal } from '@/components/settings';
 import './Sidebar.less';
 
 const formatTime = (timestamp: number): string => {
@@ -32,6 +33,7 @@ export const Sidebar: React.FC = () => {
 
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; right: number } | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     if (!confirmId) return;
@@ -112,7 +114,12 @@ export const Sidebar: React.FC = () => {
 
       <div className="sidebar-footer">
         <ThemeToggle />
+        <button className="settings-btn" onClick={() => setShowSettings(true)} title="设置">
+          <SettingsIcon size={16} />
+        </button>
       </div>
+
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
 
       {confirmId && popoverPos && createPortal(
         <div

@@ -4,10 +4,22 @@ import { getStoredTheme, setStoredTheme, applyTheme } from '@/utils/theme';
 
 const API_BASE = '/api';
 
+export interface AppSettings {
+  provider: string;
+  anthropic: { apiKey: string; baseUrl?: string; model: string };
+  openai: { apiKey: string; baseUrl: string; model: string };
+  workspace: string;
+  ui: { showToolCalls: boolean };
+}
+
 interface AppState {
   themeMode: ThemeMode;
   setThemeMode: (mode: ThemeMode) => void;
   effectiveTheme: 'light' | 'dark';
+
+  settings: AppSettings | null;
+  loadSettings: () => Promise<void>;
+  saveSettings: (patch: Partial<AppSettings>) => Promise<void>;
 
   conversations: Conversation[];
   activeConversationId: string | null;
@@ -51,6 +63,35 @@ export const useAppStore = create<AppState>()(
       setStoredTheme(mode);
       const effective = applyTheme(mode);
       set({ themeMode: mode, effectiveTheme: effective });
+    },
+
+    settings: null,
+
+    loadSettings: async () => {
+      try {
+        const res = await fetch(`${API_BASE}/config`);
+        if (!res.ok) return;
+        const data = await res.json();
+        set({ settings: data as AppSettings });
+      } catch (err) {
+        console.error('Failed to load settings:', err);
+      }
+    },
+
+    saveSettings: async (patch) => {
+      try {
+        const res = await fetch(`${API_BASE}/config`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        });
+        if (!res.ok) return;
+        set((state) => ({
+          settings: state.settings ? { ...state.settings, ...patch } : null,
+        }));
+      } catch (err) {
+        console.error('Failed to save settings:', err);
+      }
     },
 
     conversations: [],
