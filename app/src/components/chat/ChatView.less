@@ -1,0 +1,204 @@
+@import (reference) '../../styles/variables.less';
+
+.chat-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.welcome {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 40px 24px;
+}
+
+.welcome-input-area {
+  width: 100%;
+  max-width: @max-message-width;
+
+  .input-wrapper {
+    border-radius: 16px;
+    padding: 14px 14px 10px;
+
+    textarea {
+      font-size: 15px;
+      min-height: 72px;
+    }
+  }
+}
+
+.welcome-logo {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, #d97706, #f59e0b);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+}
+
+.welcome h1 {
+  font-size: 28px;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+.welcome p {
+  font-size: 15px;
+  color: var(--text-2);
+  text-align: center;
+  max-width: 440px;
+  line-height: 1.7;
+}
+
+.welcome-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  max-width: 600px;
+}
+
+.chip {
+  padding: 10px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: @radius;
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all @transition-normal;
+  text-align: left;
+
+  &:hover {
+    background: var(--surface2);
+    border-color: #444;
+    color: var(--text);
+  }
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 0;
+  scroll-behavior: smooth;
+}
+
+.input-area {
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  flex-shrink: 0;
+}
+
+.input-box {
+  max-width: @max-message-width;
+  margin: 0 auto;
+  position: relative;
+}
+
+.input-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  padding: 10px 12px;
+  transition: border-color @transition-normal;
+
+  &:focus-within {
+    border-color: #444;
+  }
+
+  textarea {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.6;
+    resize: none;
+    max-height: 200px;
+    overflow-y: auto;
+
+    &::placeholder {
+      color: var(--text-3);
+    }
+
+    &::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--border2);
+      border-radius: 2px;
+    }
+  }
+}
+
+.send-btn {
+  width: 34px;
+  height: 34px;
+  background: var(--accent);
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background @transition-normal, transform @transition-fast;
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    background: #f59e0b;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  &:disabled {
+    background: #3a3a3a;
+    cursor: not-allowed;
+    color: var(--text-3);
+  }
+}
+
+.input-hint {
+  font-size: 11px;
+  color: var(--text-3);
+  text-align: center;
+  margin-top: 8px;
+}
+
+@media (max-width: 640px) {
+  .welcome {
+    padding: 20px;
+  }
+
+  .welcome-chips {
+    gap: 8px;
+  }
+
+  .chip {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .input-area {
+    padding: 12px 16px 16px;
+  }
+}

@@ -1,0 +1,134 @@
+@import (reference) '../../styles/variables.less';
+
+.tool-card {
+  margin-top: 10px;
+  border: 1px solid var(--border2);
+  border-radius: @radius-sm;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.tool-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background @transition-fast;
+
+  &:hover {
+    background: var(--surface2);
+  }
+}
+
+.tool-icon {
+  color: var(--text-3);
+}
+
+.tool-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+}
+
+.tool-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+
+  &.running {
+    color: var(--accent);
+  }
+
+  &.done {
+    color: var(--green);
+  }
+
+  &.error {
+    color: var(--red);
+  }
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(217, 119, 6, 0.3);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tool-chevron {
+  color: var(--text-3);
+  transition: transform @transition-slow;
+}
+
+.tool-card.open .tool-chevron {
+  transform: rotate(90deg);
+}
+
+.tool-body {
+  border-top: 1px solid var(--border);
+}
+
+.tool-section-label {
+  padding: 8px 14px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.tool-code {
+  padding: 8px 14px 12px;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 240px;
+  overflow-y: auto;
+  line-height: 1.5;
+}
+
+.tool-result-code {
+  padding: 8px 14px 12px;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow-y: auto;
+  line-height: 1.5;
+  border-top: 1px solid var(--border);
+
+  &.success {
+    color: #a3e6b4;
+  }
+
+  &.error {
+    color: #fca5a5;
+  }
+}
+
+[data-theme="light"] .tool-result-code {
+  &.success {
+    color: #15803d;
+  }
+
+  &.error {
+    color: #b91c1c;
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "asyn-agents",
+  "version": "1.0.0",
+  "description": "AI Agent HTTP service with real-time streaming communication",
+  "type": "module",
+  "scripts": {
+    "dev:server": "cd server && npm run dev",
+    "dev:app": "cd app && npm run dev",
+    "dev:all": "cd server && npm run dev & cd app && npm run dev",
+    "build:server": "cd server && npm run build",
+    "build:app": "cd app && npm run build",
+    "build": "npm run build:server && npm run build:app",
+    "start": "cd server && npm start",
+    "install:all": "cd server && npm install && cd ../app && npm install",
+    "test": "cd server && npx vitest run",
+    "test:watch": "cd server && npx vitest",
+    "test:coverage": "cd server && npx vitest run --coverage"
+  }
+}

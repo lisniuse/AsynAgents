@@ -1,0 +1,25 @@
+{
+  "provider": "openai",
+  "anthropic": {
+    "apiKey": "",
+    "model": "claude-opus-4-6"
+  },
+  "openai": {
+    "apiKey": "your-api-key-here",
+    "baseUrl": "https://api.openai.com/v1",
+    "model": "gpt-4o"
+  },
+  "server": {
+    "port": 6868
+  },
+  "app": {
+    "port": 2323
+  },
+  "workspace": "",
+  "logging": {
+    "enabled": true,
+    "level": "info",
+    "maxFiles": 5,
+    "maxSize": "10m"
+  }
+}
