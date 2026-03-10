@@ -13,6 +13,8 @@ AsynAgents is built for long-running, tool-using, file-editing agent work with r
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue.svg)](https://www.typescriptlang.org)
 
+[**English**](./README.md) | [简体中文](./README_CN.md)
+
 </div>
 
 ## Why It Stands Out
@@ -160,24 +162,24 @@ Local storage in ~/.asynagents/
 
 ```text
 asyn-agents/
-├─ app/                        # React frontend
-│  └─ src/
-│     ├─ components/
-│     ├─ hooks/
-│     ├─ stores/
-│     └─ types/
-├─ server/                     # Express backend
-│  └─ src/
-│     ├─ agent/                # SubAgent loop, tools, providers
-│     ├─ experience/           # Experience storage, loader, scheduler, summarizer
-│     ├─ queue/                # SSE replay buffer
-│     ├─ routes/               # API routes
-│     ├─ skills/               # Skill loader
-│     ├─ storage/              # Conversation persistence
-│     └─ types/
-├─ skills/                     # Built-in skills
-├─ config.ts                   # Config schema and defaults
-└─ config.example.json         # Example runtime config
+|-- app/                        # React frontend
+|   `-- src/
+|       |-- components/
+|       |-- hooks/
+|       |-- stores/
+|       `-- types/
+|-- server/                     # Express backend
+|   `-- src/
+|       |-- agent/              # SubAgent loop, tools, providers
+|       |-- experience/         # Experience storage, loader, scheduler, summarizer
+|       |-- queue/              # SSE replay buffer
+|       |-- routes/             # API routes
+|       |-- skills/             # Skill loader
+|       |-- storage/            # Conversation persistence
+|       `-- types/
+|-- skills/                     # Built-in skills
+|-- config.ts                   # Config schema and defaults
+`-- config.example.json         # Example runtime config
 ```
 
 ## Quick Start
@@ -268,8 +270,8 @@ Example layout:
 
 ```text
 skills/
-└─ my-skill/
-   └─ SKILL.md
+`-- my-skill/
+   `-- SKILL.md
 ```
 
 Minimal example:
