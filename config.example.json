@@ -19,7 +19,8 @@
     "model": "gpt-4o"
   },
   "server": {
-    "port": 6868
+    "port": 6868,
+    "hostname": ""
   },
   "app": {
     "port": 2323

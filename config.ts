@@ -26,6 +26,7 @@ export interface Config {
   };
   server: {
     port: number;
+    hostname: string;
   };
   app: {
     port: number;
@@ -74,6 +75,7 @@ const defaultConfig: Config = {
   },
   server: {
     port: 6868,
+    hostname: '',
   },
   app: {
     port: 2323,

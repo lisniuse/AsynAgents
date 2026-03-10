@@ -12,6 +12,7 @@ app.get('/health', (_req, res) => {
     provider: config.provider,
     model: activeModel(),
     baseUrl: config.provider === 'openai' ? config.openai.baseUrl : undefined,
+    hostname: config.server.hostname,
   });
 });
 
@@ -45,6 +46,12 @@ describe('Health API', () => {
         expect(response.body).toHaveProperty('baseUrl');
         expect(typeof response.body.baseUrl).toBe('string');
       }
+    });
+
+    it('should return hostname information', async () => {
+      const response = await request(app).get('/health');
+      expect(response.body).toHaveProperty('hostname');
+      expect(typeof response.body.hostname).toBe('string');
     });
   });
 });

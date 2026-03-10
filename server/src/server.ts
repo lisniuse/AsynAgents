@@ -55,6 +55,7 @@ app.get('/health', async (_req, res) => {
     pythonAvailable: isPythonToolAvailable(),
     configFile: CONFIG_PATH,
     workspace: workspaceDir,
+    hostname: config.server.hostname,
     experienceCount: experiences.length,
     ...(validation.errors.length > 0 && { configErrors: validation.errors }),
   });
@@ -65,23 +66,26 @@ const experienceScheduler = new ExperienceScheduler();
 async function bootstrap(): Promise<void> {
   const pythonProbe = await probePythonTool();
   experienceScheduler.start();
+  const listenHost = config.server.hostname.trim();
 
-  app.listen(config.server.port, async () => {
+  const onListening = async () => {
     const model = activeModel();
     const providerLabel = config.provider === 'openai'
       ? `OpenAI-compatible [${config.openai.baseUrl}]`
       : 'Anthropic';
+    const hostForDisplay = listenHost || 'localhost';
 
     const validation = validateConfig();
     const skills = loadSkills();
     const experiences = await listExperiences().catch(() => []);
 
     log.info('Asyn Agents Server started', {
-      url: `http://localhost:${config.server.port}`,
+      url: `http://${hostForDisplay}:${config.server.port}`,
       provider: providerLabel,
       model,
       configFile: CONFIG_PATH,
       workspace: workspaceDir,
+      hostname: config.server.hostname,
       pythonPath: config.python.path,
       pythonAvailable: isPythonToolAvailable(),
       logLevel: config.logging.level,
@@ -91,7 +95,8 @@ async function bootstrap(): Promise<void> {
     });
 
     console.log('\nAsyn Agents Server');
-    console.log(`   URL:        http://localhost:${config.server.port}`);
+    console.log(`   URL:        http://${hostForDisplay}:${config.server.port}`);
+    console.log(`   Hostname:   ${listenHost || '(all interfaces)'}`);
     console.log(`   Provider:   ${providerLabel}`);
     console.log(`   Model:      ${model}`);
     console.log(`   Config:     ${CONFIG_PATH}`);
@@ -112,6 +117,33 @@ async function bootstrap(): Promise<void> {
       console.log(`   Skills:     ${skills.map((skill) => skill.name).join(', ')}`);
     }
     console.log();
+  };
+
+  const server = listenHost
+    ? app.listen(config.server.port, listenHost, onListening)
+    : app.listen(config.server.port, onListening);
+
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    experienceScheduler.stop();
+
+    if (error.code === 'EADDRINUSE') {
+      const message = `Port ${config.server.port}${listenHost ? ` on ${listenHost}` : ''} is already in use. Stop the existing server or change "server.port" or "server.hostname" in ${CONFIG_PATH}.`;
+      console.error(message);
+      log.error('Server failed to start', {
+        error: message,
+        port: config.server.port,
+        hostname: config.server.hostname,
+      });
+      process.exit(1);
+      return;
+    }
+
+    console.error(error.message);
+    log.error('Server failed to start', {
+      error: error.message,
+      code: error.code,
+    });
+    process.exit(1);
   });
 }
 
