@@ -86,6 +86,8 @@ export default {
   personality: 'AI 人格',
   personalityPlaceholder: '例如：幽默风趣、语气轻松，喜欢用表情符号',
   personalityHint: '描述 AI 的性格和对话风格，留空则使用默认风格',
+  maxIterations: '最大轮次',
+  maxIterationsHint: '每次对话 Agent 最多执行的轮次，0 表示不限制',
   save: '保存',
   saved: '已保存 ✓',
   saving: '保存中...',

@@ -144,6 +144,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   </>
                 )}
 
+                <div className="settings-field" style={{ marginTop: 12 }}>
+                  <label>{t.maxIterations}</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.maxIterations ?? 0}
+                    onChange={(e) => setForm({ ...form, maxIterations: Math.max(0, parseInt(e.target.value) || 0) })}
+                  />
+                  <div className="field-hint">{t.maxIterationsHint}</div>
+                </div>
+
                 <div className="field-hint" style={{ marginTop: 8 }}>{t.restartHint}</div>
               </div>
             )}

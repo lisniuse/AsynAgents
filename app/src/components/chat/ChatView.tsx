@@ -18,6 +18,7 @@ export const ChatView: React.FC = () => {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
 
+  const conversationsLoaded = useAppStore((s) => s.conversationsLoaded);
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
   const messages = activeConversation?.messages ?? [];
 
@@ -109,6 +110,9 @@ export const ChatView: React.FC = () => {
     setInputValue(text);
     textareaRef.current?.focus();
   };
+
+  // Don't render until conversations are loaded to avoid flashing the welcome screen
+  if (!conversationsLoaded) return null;
 
   const isWelcome = !activeConversationId || messages.length === 0;
 

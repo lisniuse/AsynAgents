@@ -39,6 +39,7 @@ export interface Config {
     userName: string;
     personality: string;
   };
+  maxIterations: number; // 0 = unlimited
 }
 
 export const CONFIG_DIR = join(homedir(), '.asynagents');
@@ -78,6 +79,7 @@ const defaultConfig: Config = {
     userName: '',
     personality: '',
   },
+  maxIterations: 0,
 };
 
 function loadConfig(): Config {

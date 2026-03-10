@@ -11,7 +11,8 @@ import type { SSEEvent } from '../types/index.js';
 
 type SimpleMsg = { role: 'user' | 'assistant'; content: string };
 
-const MAX_ITERATIONS = 20;
+// 0 means unlimited; fall back to 100 as a safety cap when unlimited
+const MAX_ITERATIONS = config.maxIterations > 0 ? config.maxIterations : 100;
 
 // Load skills once at module level (sync reads at startup)
 const skills = loadSkills();

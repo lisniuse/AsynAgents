@@ -11,6 +11,7 @@ export interface AppSettings {
   workspace: string;
   ui: { showToolCalls: boolean };
   persona: { aiName: string; userName: string; personality: string };
+  maxIterations: number;
 }
 
 interface AppState {

@@ -86,6 +86,8 @@ export default {
   personality: 'Personality',
   personalityPlaceholder: 'e.g. Witty and casual, likes using emojis',
   personalityHint: 'Describe the AI tone and style. Leave blank for default.',
+  maxIterations: 'Max Iterations',
+  maxIterationsHint: 'Max agent turns per conversation. 0 = unlimited.',
   save: 'Save',
   saved: 'Saved ✓',
   saving: 'Saving...',
