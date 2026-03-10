@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import type { LLMProvider, TurnResult, ToolCall, EmitFn } from './base.js';
 import { buildSystemPrompt } from './base.js';
-import { openAITools } from '../tools.js';
+import { getOpenAITools } from '../tools.js';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions.js';
 
 type SimpleMsg = { role: 'user' | 'assistant'; content: string };
@@ -53,7 +53,7 @@ export class OpenAIProvider implements LLMProvider {
     const stream = await this.client.chat.completions.create({
       model: this.model,
       messages: this.messages,
-      tools: openAITools,
+      tools: getOpenAITools(),
       tool_choice: 'auto',
       stream: true,
     });

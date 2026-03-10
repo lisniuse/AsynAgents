@@ -15,6 +15,8 @@ export interface SSEEvent {
   index?: number; // position in per-conversation buffer
 }
 
+export type ThemeMode = 'light' | 'dark' | 'system';
+
 export interface ChatRequest {
   conversationId: string;
   conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;

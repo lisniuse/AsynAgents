@@ -5,7 +5,10 @@ import en from './en';
 export type Translations = typeof zh;
 export type Language = 'zh' | 'en';
 
-export const translations: Record<Language, Translations> = { zh, en };
+export const translations: Record<Language, Translations> = {
+  zh,
+  en: en as unknown as Translations,
+};
 
 export function useT(): Translations {
   const settings = useAppStore((s) => s.settings);

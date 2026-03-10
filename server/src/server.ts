@@ -9,6 +9,7 @@ import configRouter from './routes/config.js';
 import { config, activeModel, validateConfig, workspaceDir, CONFIG_PATH } from '../../config.js';
 import { logger, log } from './utils/logger.js';
 import { loadSkills } from './skills/SkillLoader.js';
+import { probePythonTool, isPythonToolAvailable } from './agent/tools.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -51,11 +52,15 @@ app.get('/health', (_req, res) => {
     provider: config.provider,
     model: activeModel(),
     baseUrl: config.provider === 'openai' ? config.openai.baseUrl : undefined,
+    pythonPath: config.python.path,
+    pythonAvailable: isPythonToolAvailable(),
     configFile: CONFIG_PATH,
     workspace: workspaceDir,
     ...(validation.errors.length > 0 && { configErrors: validation.errors }),
   });
 });
+
+const pythonProbe = await probePythonTool();
 
 app.listen(config.server.port, () => {
   const model = activeModel();
@@ -72,6 +77,8 @@ app.listen(config.server.port, () => {
     model,
     configFile: CONFIG_PATH,
     workspace: workspaceDir,
+    pythonPath: config.python.path,
+    pythonAvailable: isPythonToolAvailable(),
     logLevel: config.logging.level,
     configured: validation.valid,
     skills: skills.map((s) => s.name),
@@ -83,6 +90,11 @@ app.listen(config.server.port, () => {
   console.log(`   Model:     ${model}`);
   console.log(`   Config:    ${CONFIG_PATH}`);
   console.log(`   Workspace: ${workspaceDir}`);
+  console.log(`   Python:    ${config.python.path}`);
+  console.log(`   Python OK: ${isPythonToolAvailable() ? 'yes' : 'no'}`);
+  if (!pythonProbe.available && pythonProbe.error) {
+    console.log(`              ${pythonProbe.error.split('\n')[0]}`);
+  }
   if (validation.valid) {
     console.log(`   API Key:   ✓ configured`);
   } else {

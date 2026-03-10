@@ -1,6 +1,6 @@
 import { config } from '../../../config.js';
 import { messageQueue } from '../queue/MessageQueue.js';
-import { executeTool } from './tools.js';
+import { executeTool, isPythonToolAvailable } from './tools.js';
 import { AnthropicProvider } from './providers/anthropic.js';
 import { OpenAIProvider } from './providers/openai.js';
 import { createChildLogger } from '../utils/logger.js';
@@ -11,18 +11,26 @@ import type { SSEEvent } from '../types/index.js';
 
 type SimpleMsg = { role: 'user' | 'assistant'; content: string };
 
+function toLogMeta(data: unknown): Record<string, unknown> | undefined {
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    return data as Record<string, unknown>;
+  }
+  if (data === undefined) return undefined;
+  return { value: data };
+}
+
 // 0 means unlimited; fall back to 100 as a safety cap when unlimited
 const MAX_ITERATIONS = config.maxIterations > 0 ? config.maxIterations : 100;
 
 // Load skills once at module level (sync reads at startup)
 const skills = loadSkills();
-const systemPrompt = buildSystemPrompt(
-  buildSkillsPrompt(skills),
-  config.ui?.userLanguage ?? 'auto',
-  config.persona
-);
-
 function createProvider(history: SimpleMsg[], userMessage: string, images?: string[]): LLMProvider {
+  const systemPrompt = buildSystemPrompt(
+    buildSkillsPrompt(skills),
+    config.ui?.userLanguage ?? 'auto',
+    config.persona
+  );
+
   if (config.provider === 'openai') {
     return new OpenAIProvider(
       config.openai.apiKey,
@@ -72,7 +80,7 @@ export class SubAgent {
 
     const publish = (type: SSEEvent['type'], data: unknown): void => {
       if (this.stopped) return;
-      logger.debug(`Publishing event: ${type}`, data);
+      logger.debug(`Publishing event: ${type}`, toLogMeta(data));
       messageQueue.publish(conversationId, { type, threadId, data, timestamp: Date.now() });
     };
 
@@ -95,7 +103,7 @@ export class SubAgent {
         const result = await provider.doTurn((type, data) => {
           if (this.stopped) return;
           
-          logger.debug(`Provider emitted: ${type}`, data);
+          logger.debug(`Provider emitted: ${type}`, toLogMeta(data));
           
           if (type === 'thinking_delta') {
             const delta = (data as { text: string }).text;
@@ -138,6 +146,12 @@ export class SubAgent {
           }
 
           logger.info(`Executing tool: ${tc.name}`);
+          if (tc.name === 'python' && !isPythonToolAvailable()) {
+            const output = 'Error: Python tool is disabled because the configured Python interpreter is unavailable.';
+            publish('tool_result', { id: tc.id, toolName: tc.name, result: output, isError: true });
+            results.push({ id: tc.id, result: output });
+            continue;
+          }
           const output = await executeTool(tc.name, tc.input);
           const isError = output.startsWith('Error') || output.startsWith('Command failed');
           logger.info('Tool execution completed', { toolName: tc.name, isError, outputLength: output.length });

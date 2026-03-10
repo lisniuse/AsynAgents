@@ -15,23 +15,23 @@ describe('Chat API', () => {
         .send({ message: 'Hello' });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toBe('sessionId and message are required');
+      expect(response.body.error).toBe('conversationId and message (or images) are required');
     });
 
     it('should return 400 if message is missing', async () => {
       const response = await request(app)
         .post('/api/chat')
-        .send({ sessionId: 'test-session' });
+        .send({ conversationId: 'test-conversation' });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toBe('sessionId and message are required');
+      expect(response.body.error).toBe('conversationId and message (or images) are required');
     });
 
     it('should return 200 and threadId for valid request', async () => {
       const response = await request(app)
         .post('/api/chat')
         .send({
-          sessionId: 'test-session',
+          conversationId: 'test-conversation',
           message: 'Hello',
           conversationHistory: [],
         });
@@ -50,7 +50,7 @@ describe('Chat API', () => {
       const response = await request(app)
         .post('/api/chat')
         .send({
-          sessionId: 'test-session',
+          conversationId: 'test-conversation',
           message: 'Hello',
           conversationHistory,
         });

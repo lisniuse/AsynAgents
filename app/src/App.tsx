@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Routes, Route, useParams, useNavigate, Navigate } from 'react-router-dom';
+import { Routes, Route, useParams, Navigate } from 'react-router-dom';
 import { Sidebar } from '@/components/sidebar';
 import { ChatView } from '@/components/chat';
 import { useAppStore } from '@/stores/appStore';

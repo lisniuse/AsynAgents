@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '@/stores/appStore';
-import type { AppSettings } from '@/stores/appStore';
+import type { AppSettings, ConfigSaveResult } from '@/stores/appStore';
 import { useT } from '@/i18n';
 import { BoltIcon, ToolIcon, MonitorIcon, BrainIcon } from '@/components/icons';
 import './SettingsModal.less';
@@ -10,8 +10,11 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-const DEFAULT_UI = { showToolCalls: true, language: 'zh' as const, userLanguage: 'auto' as const };
+type UiSettings = NonNullable<AppSettings['ui']>;
+
+const DEFAULT_UI: UiSettings = { showToolCalls: true, language: 'zh', userLanguage: 'auto' };
 const DEFAULT_PERSONA = { aiName: '', userName: '', personality: '' };
+const DEFAULT_PYTHON = { path: 'python' };
 
 type Section = 'model' | 'workspace' | 'ui' | 'persona';
 
@@ -19,6 +22,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const t = useT();
   const { settings, saveSettings } = useAppStore();
   const [form, setForm] = useState<AppSettings | null>(null);
+  const [pythonStatus, setPythonStatus] = useState<{ available: boolean; path?: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [activeSection, setActiveSection] = useState<Section>('model');
@@ -26,11 +30,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   useEffect(() => {
     if (settings) {
       const copy = JSON.parse(JSON.stringify(settings));
+      if (!copy.python) copy.python = { ...DEFAULT_PYTHON };
+      else copy.python = { ...DEFAULT_PYTHON, ...copy.python };
       if (!copy.ui) copy.ui = { ...DEFAULT_UI };
       else copy.ui = { ...DEFAULT_UI, ...copy.ui };
       setForm(copy);
     }
   }, [settings]);
+
+  const refreshPythonStatus = (data?: { pythonAvailable?: boolean; pythonPath?: string } | null) => {
+    if (!data) return;
+    setPythonStatus({
+      available: Boolean(data.pythonAvailable),
+      path: typeof data.pythonPath === 'string' ? data.pythonPath : undefined,
+    });
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch('/health')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        refreshPythonStatus(data);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPythonStatus(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (!form) return null;
 
@@ -44,14 +78,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setForm({ ...form, anthropic: { ...form.anthropic, [k]: v } });
   const setOpenAIField = (k: keyof AppSettings['openai'], v: string) =>
     setForm({ ...form, openai: { ...form.openai, [k]: v } });
+  const setPythonPath = (v: string) =>
+    setForm({ ...form, python: { ...form.python, path: v } });
   const setWorkspace = (v: string) => setForm({ ...form, workspace: v });
   const setUiField = (patch: Partial<typeof DEFAULT_UI>) =>
     setForm({ ...form, ui: { ...ui, ...patch } });
 
   const handleSave = async () => {
     setSaving(true);
-    await saveSettings(form);
+    const result = await saveSettings(form);
     setSaving(false);
+    refreshPythonStatus(result as ConfigSaveResult | null);
     setSaved(true);
     setTimeout(() => onClose(), 800);
   };
@@ -162,6 +199,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             {/* 工作区 */}
             {activeSection === 'workspace' && (
               <div className="settings-section">
+                <div className="settings-field">
+                  <label>{t.pythonPath}</label>
+                  <input
+                    type="text"
+                    value={form.python.path}
+                    onChange={(e) => setPythonPath(e.target.value)}
+                    placeholder="python"
+                  />
+                  <div className="field-hint">{t.pythonPathHint}</div>
+                  {pythonStatus && (
+                    <div className={`status-badge ${pythonStatus.available ? 'ok' : 'error'}`}>
+                      {pythonStatus.available ? t.pythonStatusOk : t.pythonStatusError}
+                      {pythonStatus.path ? `: ${pythonStatus.path}` : ''}
+                    </div>
+                  )}
+                  <div className="field-hint">{t.pythonStatusHint}</div>
+                </div>
                 <div className="settings-field">
                   <label>{t.workspaceDir}</label>
                   <input type="text" value={form.workspace}

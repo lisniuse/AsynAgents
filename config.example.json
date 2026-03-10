@@ -1,5 +1,9 @@
 {
   "provider": "openai",
+  "maxIterations": 20,
+  "python": {
+    "path": "python"
+  },
   "anthropic": {
     "apiKey": "",
     "model": "claude-opus-4-6"

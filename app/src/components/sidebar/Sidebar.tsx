@@ -9,22 +9,6 @@ import { ConversationsManager } from './ConversationsManager';
 import { useT } from '@/i18n';
 import './Sidebar.less';
 
-const formatTime = (timestamp: number, t: ReturnType<typeof useT>): string => {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } else if (diffDays === 1) {
-    return t.yesterday;
-  } else if (diffDays < 7) {
-    return `${diffDays}d ago`;
-  } else {
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  }
-};
-
 interface SidebarProps {
   mobileOpen?: boolean;
   onMobileClose?: () => void;

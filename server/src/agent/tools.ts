@@ -1,17 +1,17 @@
 import { exec } from 'child_process';
-import { promisify } from 'util';
+import { mkdirSync, existsSync } from 'fs';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { mkdirSync, existsSync } from 'fs';
+import { promisify } from 'util';
 import type Anthropic from '@anthropic-ai/sdk';
 import type OpenAI from 'openai';
-import { workspaceDir } from '../../../config.js';
+import { config, workspaceDir } from '../../../config.js';
 import { getSkillContent } from '../skills/SkillLoader.js';
 
 const execAsync = promisify(exec);
 const MAX_OUTPUT = 12000;
+let pythonToolAvailable = true;
 
-// 确保 workspace 目录存在
 if (!existsSync(workspaceDir)) {
   mkdirSync(workspaceDir, { recursive: true });
 }
@@ -21,10 +21,58 @@ function resolveWorkspacePath(inputPath: string): string {
   return path.resolve(workspaceDir, inputPath);
 }
 
-// ── Tool definitions ─────────────────────────────────────────────────────
+function decodeCommandOutput(buf: Buffer | string): string {
+  if (typeof buf === 'string') return buf;
+  const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(buf);
+  if (!utf8.includes('\uFFFD')) return utf8;
+  if (process.platform === 'win32') {
+    return new TextDecoder('gbk').decode(buf);
+  }
+  return utf8;
+}
 
-/** Shared tool schemas in Anthropic format (source of truth) */
-export const anthropicTools: Anthropic.Tool[] = [
+function truncateOutput(output: string): string {
+  return output.length > MAX_OUTPUT
+    ? output.slice(0, MAX_OUTPUT) + '\n... [output truncated]'
+    : output;
+}
+
+function quoteShellArg(value: string): string {
+  if (process.platform === 'win32') {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+export function buildPythonCommand(code: string): string {
+  const pythonPath = (config.python?.path || 'python').trim() || 'python';
+  return `${quoteShellArg(pythonPath)} -c ${quoteShellArg(code)}`;
+}
+
+export function setPythonToolAvailable(available: boolean): void {
+  pythonToolAvailable = available;
+}
+
+export function isPythonToolAvailable(): boolean {
+  return pythonToolAvailable;
+}
+
+export async function probePythonTool(): Promise<{ available: boolean; error?: string }> {
+  try {
+    const output = await executeBash(buildPythonCommand('import sys; print(sys.version)'), 10000);
+    const available = !output.startsWith('Error') && !output.startsWith('Command failed');
+    setPythonToolAvailable(available);
+    return available
+      ? { available: true }
+      : { available: false, error: output };
+  } catch (err: unknown) {
+    const error = (err as Error).message || 'Unknown error';
+    setPythonToolAvailable(false);
+    return { available: false, error };
+  }
+}
+
+const allAnthropicTools: Anthropic.Tool[] = [
   {
     name: 'bash',
     description:
@@ -36,6 +84,19 @@ export const anthropicTools: Anthropic.Tool[] = [
         timeout: { type: 'number', description: 'Timeout in ms (default: 30000)' },
       },
       required: ['command'],
+    },
+  },
+  {
+    name: 'python',
+    description:
+      'Execute Python code with the configured Python interpreter path. Use for scripts, calculations, parsing, and data processing.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        code: { type: 'string', description: 'Python code to execute' },
+        timeout: { type: 'number', description: 'Timeout in ms (default: 30000)' },
+      },
+      required: ['code'],
     },
   },
   {
@@ -87,64 +148,64 @@ export const anthropicTools: Anthropic.Tool[] = [
   },
 ];
 
-/** Convert Anthropic tool format → OpenAI tool format */
-export const openAITools: OpenAI.Chat.ChatCompletionTool[] = anthropicTools.map((t) => ({
-  type: 'function',
-  function: {
-    name: t.name,
-    description: t.description ?? '',
-    parameters: t.input_schema as OpenAI.FunctionParameters,
-  },
-}));
+export function getAnthropicTools(): Anthropic.Tool[] {
+  return allAnthropicTools.filter((tool) => tool.name !== 'python' || pythonToolAvailable);
+}
 
-// ── Tool execution ───────────────────────────────────────────────────────
+export function getOpenAITools(): OpenAI.Chat.ChatCompletionTool[] {
+  return getAnthropicTools().map((tool) => ({
+    type: 'function',
+    function: {
+      name: tool.name,
+      description: tool.description ?? '',
+      parameters: tool.input_schema as OpenAI.FunctionParameters,
+    },
+  }));
+}
+
+async function executeBash(command: string, timeout: number): Promise<string> {
+  try {
+    const result = await execAsync(command, {
+      timeout,
+      maxBuffer: 1024 * 1024 * 5,
+      cwd: workspaceDir,
+      encoding: 'buffer',
+    });
+    const stdout = decodeCommandOutput((result as unknown as { stdout: Buffer }).stdout);
+    const stderr = decodeCommandOutput((result as unknown as { stderr: Buffer }).stderr);
+    let output = '';
+    if (stdout) output += stdout;
+    if (stderr) output += (output ? '\n[stderr]\n' : '[stderr]\n') + stderr;
+    if (!output) output = '(command completed with no output)';
+    return truncateOutput(output);
+  } catch (err: unknown) {
+    const error = err as { message: string; stderr?: Buffer | string; stdout?: Buffer | string };
+    const firstLine = error.message.split('\n')[0];
+    let output = firstLine.startsWith('Command failed')
+      ? firstLine
+      : `Command failed: ${firstLine}`;
+    if (error.stderr) output += `\n[stderr]\n${decodeCommandOutput(error.stderr)}`;
+    if (error.stdout) output += `\n[stdout]\n${decodeCommandOutput(error.stdout)}`;
+    return truncateOutput(output);
+  }
+}
 
 export async function executeTool(
   name: string,
   input: Record<string, unknown>
 ): Promise<string> {
   switch (name) {
-    case 'bash': {
-      const command = input['command'] as string;
-      const timeout = (input['timeout'] as number) || 30000;
-      const decode = (buf: Buffer | string): string => {
-        if (typeof buf === 'string') return buf;
-        // 先尝试 UTF-8，无替换字符则说明是合法 UTF-8
-        const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(buf);
-        if (!utf8.includes('\uFFFD')) return utf8;
-        // 有乱码则回退 GBK（Windows 系统命令的原生输出）
-        if (process.platform === 'win32') {
-          return new TextDecoder('gbk').decode(buf);
-        }
-        return utf8;
-      };
-      try {
-        const result = await execAsync(command, {
-          timeout,
-          maxBuffer: 1024 * 1024 * 5,
-          cwd: workspaceDir,
-          encoding: 'buffer',
-        });
-        const stdout = decode((result as unknown as { stdout: Buffer }).stdout);
-        const stderr = decode((result as unknown as { stderr: Buffer }).stderr);
-        let output = '';
-        if (stdout) output += stdout;
-        if (stderr) output += (output ? '\n[stderr]\n' : '[stderr]\n') + stderr;
-        if (!output) output = '(command completed with no output)';
-        return output.length > MAX_OUTPUT
-          ? output.slice(0, MAX_OUTPUT) + '\n... [output truncated]'
-          : output;
-      } catch (err: unknown) {
-        const e = err as { message: string; cmd?: string; stderr?: Buffer | string; stdout?: Buffer | string };
-        // e.message 包含 Node.js 用默认编码解析的 stderr，会乱码
-        // 只取第一行（"Command failed: <cmd>"），stderr/stdout 用正确编码单独解码
-        const firstLine = e.message.split('\n')[0];
-        let msg = firstLine.startsWith('Command failed') ? firstLine : `Command failed: ${firstLine}`;
-        if (e.stderr) msg += `\n[stderr]\n${decode(e.stderr)}`;
-        if (e.stdout) msg += `\n[stdout]\n${decode(e.stdout)}`;
-        return msg.slice(0, MAX_OUTPUT);
-      }
-    }
+    case 'bash':
+      return executeBash(
+        input['command'] as string,
+        (input['timeout'] as number) || 30000
+      );
+
+    case 'python':
+      return executeBash(
+        buildPythonCommand(input['code'] as string),
+        (input['timeout'] as number) || 30000
+      );
 
     case 'write_file': {
       const filePath = resolveWorkspacePath(input['path'] as string);
@@ -175,7 +236,7 @@ export async function executeTool(
       try {
         const entries = await fs.readdir(dirPath, { withFileTypes: true });
         if (entries.length === 0) return '(empty directory)';
-        const lines = entries.map((e) => `${e.isDirectory() ? '📁' : '📄'} ${e.name}`);
+        const lines = entries.map((entry) => `${entry.isDirectory() ? '[DIR]' : '[FILE]'} ${entry.name}`);
         return `Contents of ${dirPath}:\n${lines.join('\n')}`;
       } catch (err: unknown) {
         return `Error listing directory: ${(err as Error).message}`;

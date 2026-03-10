@@ -6,6 +6,9 @@ export type ApiProvider = 'anthropic' | 'openai';
 
 export interface Config {
   provider: ApiProvider;
+  python: {
+    path: string;
+  };
   anthropic: {
     apiKey: string;
     baseUrl?: string;
@@ -47,6 +50,9 @@ export const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
 
 const defaultConfig: Config = {
   provider: 'openai',
+  python: {
+    path: 'python',
+  },
   anthropic: {
     apiKey: '',
     model: 'claude-opus-4-6',
@@ -98,6 +104,7 @@ function loadConfig(): Config {
     return {
       ...defaultConfig,
       ...userConfig,
+      python: { ...defaultConfig.python, ...userConfig.python },
       anthropic: { ...defaultConfig.anthropic, ...userConfig.anthropic },
       openai: { ...defaultConfig.openai, ...userConfig.openai },
       server: { ...defaultConfig.server, ...userConfig.server },

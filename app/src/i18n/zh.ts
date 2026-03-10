@@ -1,13 +1,11 @@
 export default {
-  // Sidebar
   newChat: '新建对话',
   history: '历史对话',
   noConversations: '暂无对话记录',
   settings: '设置',
   yesterday: '昨天',
 
-  // Delete popover
-  confirmDelete: '确定删除？',
+  confirmDelete: '确定删除这个对话？',
   cancel: '取消',
   delete: '删除',
   rename: '重命名',
@@ -16,7 +14,6 @@ export default {
   bold: '加粗',
   unbold: '取消加粗',
 
-  // Message
   assistant: 'ASSISTANT',
   toolCallProcess: '工具调用过程',
   collapseToolCalls: '收起工具调用过程',
@@ -25,20 +22,18 @@ export default {
   stopping: '停止中...',
   stopped: '[已停止]',
 
-  // Welcome
-  welcomeSubtitle: 'AI 智能体系统 · 每次对话创建独立线程 · 可执行代码、读写文件、安装包',
-  inputPlaceholder: '描述你想完成的任务... (Shift+Enter 换行，Enter 发送)',
+  welcomeSubtitle: 'AI 智能体平台，每条消息都会启动独立线程，可执行代码、读写文件并安装依赖',
+  inputPlaceholder: '描述你想完成的任务...（Shift+Enter 换行，Enter 发送）',
   inputHint: 'AI 智能体可以执行命令和修改文件，请确认操作安全',
   welcomePrompts: [
-    { emoji: '🐍', text: '写一个 Python 的 Hello World 并运行它' },
-    { emoji: '🌐', text: '用 Node.js 创建一个简单的 HTTP 服务器' },
-    { emoji: '📂', text: '查看当前目录的文件结构并说明用途' },
-    { emoji: '🔢', text: '帮我写一个 Fibonacci 数列计算器并测试' },
-    { emoji: '💻', text: '查看系统信息（操作系统、内存、CPU 等）' },
-    { emoji: '📝', text: '用 bash 写一个文件批量重命名脚本' },
+    { emoji: '🐍', text: '写一个 Python Hello World 并运行它' },
+    { emoji: '🌐', text: '用 Node.js 创建一个简单的 HTTP 服务' },
+    { emoji: '📨', text: '查看当前目录结构并说明各文件作用' },
+    { emoji: '🧮', text: '写一个 Fibonacci 计算器并测试' },
+    { emoji: '💻', text: '查看系统信息，包括操作系统、内存和 CPU' },
+    { emoji: '📁', text: '写一个批量重命名文件的脚本' },
   ],
 
-  // Manage conversations
   manageHistory: '管理会话',
   searchConversations: '搜索会话...',
   selectAll: '全选',
@@ -46,14 +41,12 @@ export default {
   deleteSelected: '删除所选',
   selectedCount: (n: number) => `已选 ${n} 项`,
   noSearchResults: '未找到匹配的会话',
-  confirmBatchDelete: (n: number) => `确定删除选中的 ${n} 条会话？`,
+  confirmBatchDelete: (n: number) => `确定删除选中的 ${n} 条会话吗？`,
 
-  // Theme
   themeLight: '浅色模式',
   themeDark: '深色模式',
   themeSystem: '跟随系统',
 
-  // Settings
   settingsTitle: '设置',
   modelConfig: '模型配置',
   apiProvider: 'API 提供商',
@@ -64,8 +57,13 @@ export default {
   modelField: '模型',
   optional: '（可选）',
   workspaceSection: '工作区',
+  pythonPath: 'Python 路径',
+  pythonPathHint: 'python 工具使用的解释器，可填写 python、python3 或完整绝对路径',
+  pythonStatusOk: 'Python 可用',
+  pythonStatusError: 'Python 不可用',
+  pythonStatusHint: '点击保存时会立即重新检测。如果仍然不可用，请检查路径和执行权限。',
   workspaceDir: '工作目录',
-  workspaceDirHint: '智能体创建和修改文件的默认目录',
+  workspaceDirHint: '智能体创建和修改文件时默认使用的目录',
   uiSection: '界面',
   showToolCallsByDefault: '默认展开工具调用过程',
   showToolCallsByDefaultHint: '每条消息的工具调用区域是否默认展开',
@@ -75,20 +73,20 @@ export default {
   langZh: '中文',
   langEn: 'English',
   langAuto: '自动（跟随用户输入）',
-  restartHint: '修改模型配置后需重启服务器生效',
+  restartHint: '修改模型配置后需要重启服务端生效。Python 路径会在保存时立即重新检测。',
   personaSection: 'AI 角色',
-  aiName: 'AI 昵称',
+  aiName: 'AI 名称',
   aiNamePlaceholder: '例如：小助手',
-  aiNameHint: 'AI 自我介绍时使用的名字，留空则使用默认',
-  userName: '称呼用户',
-  userNamePlaceholder: '例如：主人、朋友',
+  aiNameHint: 'AI 自我介绍时使用的名字，留空则使用默认值',
+  userName: '用户称呼',
+  userNamePlaceholder: '例如：老板、朋友',
   userNameHint: 'AI 称呼用户的方式，留空则不特别指定',
   personality: 'AI 人格',
-  personalityPlaceholder: '例如：幽默风趣、语气轻松，喜欢用表情符号',
-  personalityHint: '描述 AI 的性格和对话风格，留空则使用默认风格',
+  personalityPlaceholder: '例如：简洁直接、幽默、偏工程化',
+  personalityHint: '描述 AI 的语气和对话风格，留空则使用默认风格',
   maxIterations: '最大轮次',
-  maxIterationsHint: '每次对话 Agent 最多执行的轮次，0 表示不限制',
+  maxIterationsHint: '每次对话中 Agent 最多执行的轮次，0 表示不限制',
   save: '保存',
-  saved: '已保存 ✓',
+  saved: '已保存',
   saving: '保存中...',
 } as const;

@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { LLMProvider, TurnResult, ToolCall, EmitFn } from './base.js';
 import { buildSystemPrompt } from './base.js';
-import { anthropicTools } from '../tools.js';
+import { getAnthropicTools } from '../tools.js';
 
 type SimpleMsg = { role: 'user' | 'assistant'; content: string };
 
@@ -56,7 +56,7 @@ export class AnthropicProvider implements LLMProvider {
       model: this.model,
       max_tokens: 8192,
       system: this.systemPrompt,
-      tools: anthropicTools,
+      tools: getAnthropicTools(),
       messages: this.messages,
     });
 

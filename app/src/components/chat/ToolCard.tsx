@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { ChevronIcon, CopyIcon, CheckIcon, ToolIcon, TerminalIcon, FileEditIcon, FileReadIcon, FolderIcon } from '@/components/icons';
+import { ChevronIcon, ToolIcon, TerminalIcon, FileEditIcon, FileReadIcon, FolderIcon } from '@/components/icons';
 import type { ToolCallState } from '@/types';
 import './ToolCard.less';
 
 const toolIconMap: Record<string, React.ReactNode> = {
   bash:           <TerminalIcon size={16} />,
+  python:         <TerminalIcon size={16} />,
   write_file:     <FileEditIcon size={16} />,
   read_file:      <FileReadIcon size={16} />,
   list_directory: <FolderIcon size={16} />,
@@ -16,13 +17,6 @@ interface ToolCardProps {
 
 export const ToolCard: React.FC<ToolCardProps> = ({ toolCall }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async (text: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const statusClass = toolCall.status;
   const statusText = {

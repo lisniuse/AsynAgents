@@ -1,3 +1,5 @@
+import { isPythonToolAvailable } from '../tools.js';
+
 export interface ToolCall {
   id: string;
   name: string;
@@ -33,6 +35,21 @@ export interface LLMProvider {
   ): void;
 }
 
+function buildToolSection(): string {
+  const toolLines = [
+    '- bash: Execute any shell command (package managers, compilers, interpreters, etc.)',
+    '- write_file: Create or overwrite a file',
+    '- read_file: Read file contents',
+    '- list_directory: List directory contents',
+  ];
+
+  if (isPythonToolAvailable()) {
+    toolLines.splice(1, 0, '- python: Execute Python code with the configured Python interpreter');
+  }
+
+  return toolLines.join('\n');
+}
+
 function buildOsSection(): string {
   const platform = process.platform;
   const arch = process.arch;
@@ -64,13 +81,11 @@ function buildOsSection(): string {
 - Path separator: forward slash (\`/\`)`;
 }
 
-const BASE_SYSTEM_PROMPT = `You are a powerful AI sub-agent with full system access. You can run shell commands, write and read files, install packages, execute code in any language, and solve complex problems.
+function buildBaseSystemPrompt(): string {
+  return `You are a powerful AI sub-agent with full system access. You can run shell commands, write and read files, install packages, execute code in any language, and solve complex problems.
 
 Available tools:
-- bash: Execute any shell command (package managers, compilers, interpreters, etc.)
-- write_file: Create or overwrite a file
-- read_file: Read file contents
-- list_directory: List directory contents
+${buildToolSection()}
 ${buildOsSection()}
 
 IMPORTANT: You must separate your thinking process from your final answer using the following format:
@@ -90,6 +105,7 @@ Guidelines:
 3. The content inside <thinking> tags will be shown separately from your final answer
 4. Be concise in your final answer
 5. Keep working until the task is FULLY completed`;
+}
 
 function buildUserLanguageSection(userLanguage: string): string {
   if (userLanguage === 'zh') {
@@ -119,10 +135,11 @@ function buildPersonaSection(persona: PersonaOptions): string {
 
 /** Build the full system prompt, optionally appending skills and user language preference. */
 export function buildSystemPrompt(skillsSection?: string, userLanguage?: string, persona?: PersonaOptions): string {
+  const basePrompt = buildBaseSystemPrompt();
   const langSection = userLanguage ? buildUserLanguageSection(userLanguage) : '';
   const personaSection = persona ? buildPersonaSection(persona) : '';
-  return BASE_SYSTEM_PROMPT + personaSection + langSection + (skillsSection ?? '');
+  return basePrompt + personaSection + langSection + (skillsSection ?? '');
 }
 
 /** @deprecated Use buildSystemPrompt() instead */
-export const SYSTEM_PROMPT = BASE_SYSTEM_PROMPT;
+export const SYSTEM_PROMPT = buildBaseSystemPrompt();

@@ -6,12 +6,24 @@ const API_BASE = '/api';
 
 export interface AppSettings {
   provider: string;
+  python: { path: string };
   anthropic: { apiKey: string; baseUrl?: string; model: string };
   openai: { apiKey: string; baseUrl: string; model: string };
   workspace: string;
-  ui: { showToolCalls: boolean };
+  ui: {
+    showToolCalls: boolean;
+    language?: 'zh' | 'en';
+    userLanguage?: 'zh' | 'en' | 'auto';
+  };
   persona: { aiName: string; userName: string; personality: string };
   maxIterations: number;
+}
+
+export interface ConfigSaveResult {
+  ok: boolean;
+  pythonAvailable?: boolean;
+  pythonPath?: string;
+  pythonError?: string;
 }
 
 interface AppState {
@@ -21,7 +33,7 @@ interface AppState {
 
   settings: AppSettings | null;
   loadSettings: () => Promise<void>;
-  saveSettings: (patch: Partial<AppSettings>) => Promise<void>;
+  saveSettings: (patch: Partial<AppSettings>) => Promise<ConfigSaveResult | null>;
 
   conversationsLoaded: boolean;
 
@@ -96,12 +108,15 @@ export const useAppStore = create<AppState>()(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patch),
         });
-        if (!res.ok) return;
+        if (!res.ok) return null;
+        const result = await res.json() as ConfigSaveResult;
         set((state) => ({
           settings: state.settings ? { ...state.settings, ...patch } : null,
         }));
+        return result;
       } catch (err) {
         console.error('Failed to save settings:', err);
+        return null;
       }
     },
 

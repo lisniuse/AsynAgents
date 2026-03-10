@@ -3,7 +3,7 @@ import { marked } from 'marked';
 import hljs from 'highlight.js';
 import { ToolCard } from './ToolCard';
 import type { Message } from '@/types';
-import { BoltIcon, BrainIcon, ChevronDownIcon, ChevronUpIcon, StopIcon, ToolIcon } from '@/components/icons';
+import { BoltIcon, ChevronDownIcon, ChevronUpIcon, StopIcon, ToolIcon } from '@/components/icons';
 import { useAppStore } from '@/stores/appStore';
 import { useT } from '@/i18n';
 import './MessageItem.less';
@@ -20,20 +20,20 @@ marked.setOptions({
 });
 
 const renderMarkdown = (content: string): string => {
-  const tokens = marked.lexer(content);
+  const tokens = marked.lexer(content) as Array<{ type: string; text?: string; lang?: string }>;
 
   return tokens.map((token) => {
     if (token.type === 'code') {
-      const codeToken = token as marked.Tokens.Code;
+      const codeToken = token as { text: string; lang?: string };
       const highlighted = codeToken.lang && hljs.getLanguage(codeToken.lang)
         ? hljs.highlight(codeToken.text, { language: codeToken.lang }).value
         : hljs.highlightAuto(codeToken.text).value;
       return `<pre><div class="code-header"><span class="code-lang">${codeToken.lang || 'text'}</span></div><code>${highlighted}</code></pre>`;
     }
     if (token.type === 'table') {
-      return `<div class="table-wrapper">${marked.parser([token] as marked.Token[])}</div>`;
+      return `<div class="table-wrapper">${marked.parser([token] as never)}</div>`;
     }
-    return marked.parser([token] as marked.Token[]);
+    return marked.parser([token] as never);
   }).join('');
 };
 
