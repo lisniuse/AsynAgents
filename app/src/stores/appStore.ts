@@ -114,8 +114,17 @@ export const useAppStore = create<AppState>()(
       try {
         const res = await fetch(`${API_BASE}/conversations`);
         if (!res.ok) { set({ conversationsLoaded: true }); return; }
-        const conversations: Conversation[] = await res.json();
-        set({ conversations, conversationsLoaded: true });
+        const serverConversations: Conversation[] = await res.json();
+        set((state) => {
+          // Don't overwrite conversations that have in-progress streaming messages
+          // (can happen when React StrictMode double-invokes this and SSE has already started)
+          const merged = serverConversations.map((sc) => {
+            const existing = state.conversations.find((c) => c.id === sc.id);
+            if (existing?.messages.some((m) => m.isStreaming)) return existing;
+            return sc;
+          });
+          return { conversations: merged, conversationsLoaded: true };
+        });
       } catch (err) {
         console.error('Failed to load conversations:', err);
         set({ conversationsLoaded: true });

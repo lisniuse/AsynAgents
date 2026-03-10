@@ -299,6 +299,16 @@ export const useSSE = () => {
 
       const conversation = useAppStore.getState().conversations.find(c => c.id === conversationId);
 
+      // Persist user message immediately so it survives a page refresh
+      if (conversation) {
+        const messagesToSave = conversation.messages.map(({ isStreaming: _, ...m }) => m);
+        fetch(`${API_BASE}/conversations/${conversationId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: messagesToSave, name: conversation.name }),
+        }).catch(console.error);
+      }
+
       try {
         const response = await fetch(`${API_BASE}/chat`, {
           method: 'POST',
