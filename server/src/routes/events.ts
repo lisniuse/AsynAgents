@@ -4,8 +4,9 @@ import { messageQueue } from '../queue/MessageQueue.js';
 
 const router = Router();
 
-router.get('/events/:sessionId', (req: Request, res: Response) => {
-  const sessionId = req.params['sessionId'] as string;
+router.get('/events/:conversationId', (req: Request, res: Response) => {
+  const conversationId = req.params['conversationId'] as string;
+  const fromIndex = Math.max(0, parseInt((req.query['from'] as string) ?? '0', 10) || 0);
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -17,13 +18,16 @@ router.get('/events/:sessionId', (req: Request, res: Response) => {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
-  send({ type: 'connected', threadId: '', data: { sessionId }, timestamp: Date.now() });
+  send({ type: 'connected', threadId: '', data: { conversationId }, timestamp: Date.now() });
 
-  const unsubscribe = messageQueue.subscribe(sessionId, (event) => {
-    send(event);
-  });
+  const unsubscribe = messageQueue.subscribe(
+    conversationId,
+    (event, index) => {
+      send({ ...event, index });
+    },
+    fromIndex
+  );
 
-  // Heartbeat to prevent connection timeout
   const heartbeat = setInterval(() => {
     res.write(': heartbeat\n\n');
   }, 20000);

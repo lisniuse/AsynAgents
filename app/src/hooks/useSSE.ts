@@ -5,11 +5,47 @@ import type { SSEEvent, ToolCallData, ToolResultData } from '@/types';
 
 const API_BASE = '/api';
 
+// ─── Per-conversation session state in localStorage ───────────────────────────
+// Tracks lastIndex (next event to request on reconnect) and whether an agent
+// is currently in-progress (so we know to replay from 0 to reconstruct state).
+
+interface SessionState {
+  threadId: string;
+  inProgress: boolean;
+  lastIndex: number;
+}
+
+const SESSIONS_KEY = 'sse_sessions';
+
+function readSessions(): Record<string, SessionState> {
+  try {
+    return JSON.parse(localStorage.getItem(SESSIONS_KEY) ?? '{}');
+  } catch {
+    return {};
+  }
+}
+
+function writeSessions(sessions: Record<string, SessionState>): void {
+  try {
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+  } catch {}
+}
+
+function getSession(conversationId: string): SessionState | null {
+  return readSessions()[conversationId] ?? null;
+}
+
+function updateSession(conversationId: string, patch: Partial<SessionState>): void {
+  const sessions = readSessions();
+  sessions[conversationId] = { ...sessions[conversationId], ...patch } as SessionState;
+  writeSessions(sessions);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+
 export const useSSE = () => {
   const navigate = useNavigate();
   const eventSourceRef = useRef<EventSource | null>(null);
-  const sessionIdRef = useRef<string>(generateSessionId());
-  const abortControllerRef = useRef<AbortController | null>(null);
   const currentThreadIdRef = useRef<string | null>(null);
 
   const {
@@ -24,68 +60,53 @@ export const useSSE = () => {
     unregisterAgent,
   } = useAppStore();
 
-  function generateSessionId(): string {
-    return 'session_' + Math.random().toString(36).substring(2, 15);
-  }
-
-  const connect = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-    }
-
-    const sessionId = sessionIdRef.current;
-    const eventSource = new EventSource(`${API_BASE}/events/${sessionId}`);
-    eventSourceRef.current = eventSource;
-
-    eventSource.onmessage = (event) => {
-      try {
-        const sseEvent: SSEEvent = JSON.parse(event.data);
-        handleEvent(sseEvent);
-      } catch (err) {
-        console.error('Failed to parse SSE event:', err);
-      }
-    };
-
-    eventSource.onerror = () => {
-      console.error('SSE connection error');
-      setTimeout(() => {
-        if (eventSourceRef.current === eventSource) {
-          connect();
-        }
-      }, 3000);
-    };
-  }, []);
-
+  // ── Event handler ──────────────────────────────────────────────────────────
   const handleEvent = useCallback(
-    (event: SSEEvent) => {
-      // 使用 getActiveConversation 获取当前活动对话，而不是依赖 activeConversationId
-      const conversation = useAppStore.getState().getActiveConversation();
-      if (!conversation) {
-        console.warn('No active conversation, ignoring event:', event.type);
-        return;
+    (event: SSEEvent, conversationId: string) => {
+      // Update replay index
+      if (typeof event.index === 'number') {
+        updateSession(conversationId, { lastIndex: event.index + 1 });
       }
 
-      const conversationId = conversation.id;
+      const conversation = useAppStore.getState().conversations.find(c => c.id === conversationId);
+      if (!conversation) return;
 
       switch (event.type) {
         case 'agent_start': {
-          const assistantMsgId = 'msg_' + Math.random().toString(36).substring(2, 15);
-          currentThreadIdRef.current = event.threadId;
-          addMessage(conversationId, {
-            id: assistantMsgId,
-            role: 'assistant',
-            content: '',
-            thinking: '',
-            timestamp: Date.now(),
-            isStreaming: true,
-            toolCalls: [],
+          updateSession(conversationId, {
             threadId: event.threadId,
+            inProgress: true,
+            lastIndex: 0,
           });
+          currentThreadIdRef.current = event.threadId;
+
+          // Only create message if not already present (e.g. loaded from server)
+          const existing = conversation.messages.find(m => m.threadId === event.threadId);
+          if (!existing) {
+            const assistantMsgId = 'msg_' + Math.random().toString(36).substring(2, 15);
+            addMessage(conversationId, {
+              id: assistantMsgId,
+              role: 'assistant',
+              content: '',
+              thinking: '',
+              timestamp: Date.now(),
+              isStreaming: true,
+              toolCalls: [],
+              threadId: event.threadId,
+            });
+          } else {
+            // Message exists (page reload replay): mark streaming again
+            updateMessage(conversationId, existing.id, { isStreaming: true });
+          }
+          // Register agent (no AbortController after reconnect, but stop still works via HTTP)
+          registerAgent(event.threadId, new AbortController());
           break;
         }
 
         case 'thinking_delta': {
-          const msg = conversation.messages.find((m) => m.role === 'assistant' && m.threadId === event.threadId);
+          const msg = useAppStore.getState().conversations
+            .find(c => c.id === conversationId)
+            ?.messages.find(m => m.role === 'assistant' && m.threadId === event.threadId);
           if (msg) {
             appendToThinking(conversationId, msg.id, (event.data as { text: string }).text);
           }
@@ -93,7 +114,9 @@ export const useSSE = () => {
         }
 
         case 'text_delta': {
-          const msg = conversation.messages.find((m) => m.role === 'assistant' && m.threadId === event.threadId);
+          const msg = useAppStore.getState().conversations
+            .find(c => c.id === conversationId)
+            ?.messages.find(m => m.role === 'assistant' && m.threadId === event.threadId);
           if (msg) {
             appendToMessage(conversationId, msg.id, (event.data as { text: string }).text);
           }
@@ -102,26 +125,32 @@ export const useSSE = () => {
 
         case 'tool_call': {
           const toolData = event.data as ToolCallData;
-          const msg = conversation.messages.find((m) => m.role === 'assistant' && m.threadId === event.threadId);
+          const msg = useAppStore.getState().conversations
+            .find(c => c.id === conversationId)
+            ?.messages.find(m => m.role === 'assistant' && m.threadId === event.threadId);
           if (msg) {
-            const preText = msg.content || undefined;
-            if (preText) {
-              updateMessage(conversationId, msg.id, { content: '' });
+            // Avoid duplicate tool calls on replay
+            const already = msg.toolCalls?.find(tc => tc.id === toolData.id);
+            if (!already) {
+              const preText = msg.content || undefined;
+              if (preText) updateMessage(conversationId, msg.id, { content: '' });
+              addToolCall(conversationId, msg.id, {
+                id: toolData.id,
+                name: toolData.name,
+                input: toolData.input,
+                preText,
+                status: 'running',
+              });
             }
-            addToolCall(conversationId, msg.id, {
-              id: toolData.id,
-              name: toolData.name,
-              input: toolData.input,
-              preText,
-              status: 'running',
-            });
           }
           break;
         }
 
         case 'tool_result': {
           const resultData = event.data as ToolResultData;
-          const msg = conversation.messages.find((m) => m.role === 'assistant' && m.threadId === event.threadId);
+          const msg = useAppStore.getState().conversations
+            .find(c => c.id === conversationId)
+            ?.messages.find(m => m.role === 'assistant' && m.threadId === event.threadId);
           if (msg) {
             updateToolCall(conversationId, msg.id, resultData.id, {
               result: resultData.result,
@@ -133,13 +162,16 @@ export const useSSE = () => {
         }
 
         case 'agent_done': {
-          const msg = conversation.messages.find((m) => m.role === 'assistant' && m.threadId === event.threadId);
+          updateSession(conversationId, { inProgress: false });
+          const msg = useAppStore.getState().conversations
+            .find(c => c.id === conversationId)
+            ?.messages.find(m => m.role === 'assistant' && m.threadId === event.threadId);
           if (msg) {
             updateMessage(conversationId, msg.id, { isStreaming: false });
           }
 
           // Save conversation to backend
-          const updatedConversation = useAppStore.getState().getActiveConversation();
+          const updatedConversation = useAppStore.getState().conversations.find(c => c.id === conversationId);
           if (updatedConversation) {
             const messagesToSave = updatedConversation.messages.map(({ isStreaming: _, ...m }) => m);
             fetch(`/api/conversations/${updatedConversation.id}`, {
@@ -150,31 +182,29 @@ export const useSSE = () => {
           }
 
           unregisterAgent(event.threadId);
-          if (currentThreadIdRef.current === event.threadId) {
-            currentThreadIdRef.current = null;
-          }
+          if (currentThreadIdRef.current === event.threadId) currentThreadIdRef.current = null;
           break;
         }
 
         case 'agent_stopped': {
-          const msg = conversation.messages.find((m) => m.role === 'assistant' && m.threadId === event.threadId);
+          updateSession(conversationId, { inProgress: false });
+          const msg = useAppStore.getState().conversations
+            .find(c => c.id === conversationId)
+            ?.messages.find(m => m.role === 'assistant' && m.threadId === event.threadId);
           if (msg) {
             updateMessage(conversationId, msg.id, {
               isStreaming: false,
               content: msg.content + '\n\n[已停止]',
             });
           }
-
           unregisterAgent(event.threadId);
-          if (currentThreadIdRef.current === event.threadId) {
-            currentThreadIdRef.current = null;
-          }
+          if (currentThreadIdRef.current === event.threadId) currentThreadIdRef.current = null;
           break;
         }
 
         case 'error': {
           console.error('Agent error:', event.data);
-          
+          updateSession(conversationId, { inProgress: false });
           if (currentThreadIdRef.current) {
             unregisterAgent(currentThreadIdRef.current);
             currentThreadIdRef.current = null;
@@ -182,27 +212,75 @@ export const useSSE = () => {
           break;
         }
 
-        case 'connected': {
-          // SSE 连接成功，可以忽略或记录
-          console.log('SSE connected:', event.data);
+        case 'connected':
+          console.log('SSE connected to conversation:', conversationId);
           break;
-        }
       }
     },
-    [addMessage, updateMessage, appendToMessage, appendToThinking, addToolCall, updateToolCall, unregisterAgent]
+    [addMessage, updateMessage, appendToMessage, appendToThinking, addToolCall, updateToolCall, registerAgent, unregisterAgent]
   );
 
+  // ── Connect / reconnect ────────────────────────────────────────────────────
+  const connect = useCallback((conversationId: string) => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
+    const session = getSession(conversationId);
+    // If agent was in-progress, replay from 0 to reconstruct message state.
+    // Otherwise, replay from where we left off (skips already-processed events).
+    const fromIndex = session?.inProgress ? 0 : (session?.lastIndex ?? 0);
+
+    const url = `${API_BASE}/events/${conversationId}?from=${fromIndex}`;
+    const es = new EventSource(url);
+    eventSourceRef.current = es;
+
+    es.onmessage = (e) => {
+      try {
+        const sseEvent: SSEEvent = JSON.parse(e.data);
+        handleEvent(sseEvent, conversationId);
+      } catch (err) {
+        console.error('Failed to parse SSE event:', err);
+      }
+    };
+
+    es.onerror = () => {
+      console.error('SSE connection error, reconnecting...');
+      setTimeout(() => {
+        if (eventSourceRef.current === es) {
+          connect(conversationId);
+        }
+      }, 3000);
+    };
+  }, [handleEvent]);
+
+  // Reconnect whenever the active conversation changes
+  useEffect(() => {
+    if (!activeConversationId) {
+      eventSourceRef.current?.close();
+      eventSourceRef.current = null;
+      return;
+    }
+    connect(activeConversationId);
+    return () => {
+      eventSourceRef.current?.close();
+      eventSourceRef.current = null;
+    };
+  }, [activeConversationId, connect]);
+
+  // ── Send message ───────────────────────────────────────────────────────────
   const sendMessage = useCallback(
     async (message: string, images?: string[]) => {
       let conversationId = activeConversationId;
-      
+
       if (!conversationId) {
         conversationId = await useAppStore.getState().createConversation();
         navigate(`/c/${conversationId}`);
       }
 
       const userMsgId = 'msg_' + Math.random().toString(36).substring(2, 15);
-      addMessage(conversationId, {
+      useAppStore.getState().addMessage(conversationId, {
         id: userMsgId,
         role: 'user',
         content: message,
@@ -210,20 +288,14 @@ export const useSSE = () => {
         timestamp: Date.now(),
       });
 
-      const conversation = useAppStore
-        .getState()
-        .conversations.find((c) => c.id === conversationId);
-
-      // 创建新的 AbortController
-      abortControllerRef.current = new AbortController();
+      const conversation = useAppStore.getState().conversations.find(c => c.id === conversationId);
 
       try {
         const response = await fetch(`${API_BASE}/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          signal: abortControllerRef.current.signal,
           body: JSON.stringify({
-            sessionId: sessionIdRef.current,
+            conversationId,
             conversationHistory: conversation?.messages.map((m) => ({
               role: m.role,
               content: m.content,
@@ -233,54 +305,28 @@ export const useSSE = () => {
           }),
         });
 
-        if (!response.ok) {
-          throw new Error('Failed to send message');
-        }
+        if (!response.ok) throw new Error('Failed to send message');
 
         const data = await response.json();
-        
-        // 注册 Agent
-        if (data.threadId && abortControllerRef.current) {
-          registerAgent(data.threadId, abortControllerRef.current);
+        if (data.threadId) {
+          registerAgent(data.threadId, new AbortController());
+          currentThreadIdRef.current = data.threadId;
         }
       } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') {
-          console.log('Message sending aborted');
-        } else {
-          console.error('Send message error:', err);
-        }
+        console.error('Send message error:', err);
       }
     },
-    [activeConversationId, addMessage, registerAgent]
+    [activeConversationId, navigate, registerAgent]
   );
 
+  // ── Stop current agent ─────────────────────────────────────────────────────
   const stopCurrentAgent = useCallback(async () => {
-    if (currentThreadIdRef.current) {
-      const { stopAgent } = useAppStore.getState();
-      const success = await stopAgent(currentThreadIdRef.current);
-      
-      if (success) {
-        abortControllerRef.current?.abort();
-        currentThreadIdRef.current = null;
-      }
-      
-      return success;
-    }
-    return false;
+    if (!currentThreadIdRef.current) return false;
+    const { stopAgent } = useAppStore.getState();
+    const success = await stopAgent(currentThreadIdRef.current);
+    if (success) currentThreadIdRef.current = null;
+    return success;
   }, []);
 
-  useEffect(() => {
-    connect();
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-    };
-  }, [connect]);
-
-  return {
-    sendMessage,
-    stopCurrentAgent,
-    currentThreadId: currentThreadIdRef.current,
-  };
+  return { sendMessage, stopCurrentAgent };
 };

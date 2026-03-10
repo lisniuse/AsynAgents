@@ -59,20 +59,20 @@ export class SubAgent {
 
   async run(
     threadId: string,
-    sessionId: string,
+    conversationId: string,
     conversationHistory: SimpleMsg[],
     userMessage: string,
     images?: string[]
   ): Promise<string> {
     this.stopped = false;
     const logger = createChildLogger(`Thread-${threadId.slice(0, 8)}`);
-    
-    logger.info('Starting agent', { sessionId, userMessageLength: userMessage.length });
-    
+
+    logger.info('Starting agent', { conversationId, userMessageLength: userMessage.length });
+
     const publish = (type: SSEEvent['type'], data: unknown): void => {
       if (this.stopped) return;
       logger.debug(`Publishing event: ${type}`, data);
-      messageQueue.publish(sessionId, { type, threadId, data, timestamp: Date.now() });
+      messageQueue.publish(conversationId, { type, threadId, data, timestamp: Date.now() });
     };
 
     publish('agent_start', { threadId });

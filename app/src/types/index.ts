@@ -12,10 +12,11 @@ export interface SSEEvent {
   threadId: string;
   data: unknown;
   timestamp: number;
+  index?: number; // position in per-conversation buffer
 }
 
 export interface ChatRequest {
-  sessionId: string;
+  conversationId: string;
   conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
   message: string;
   images?: string[]; // base64 data URLs
