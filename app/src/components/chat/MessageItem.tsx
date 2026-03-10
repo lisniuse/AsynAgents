@@ -3,7 +3,7 @@ import { marked } from 'marked';
 import hljs from 'highlight.js';
 import { ToolCard } from './ToolCard';
 import type { Message } from '@/types';
-import { BoltIcon, BrainIcon, ChevronDownIcon, ChevronUpIcon, StopIcon } from '@/components/icons';
+import { BoltIcon, BrainIcon, ChevronDownIcon, ChevronUpIcon, StopIcon, ToolIcon } from '@/components/icons';
 import { useAppStore } from '@/stores/appStore';
 import { useT } from '@/i18n';
 import './MessageItem.less';
@@ -96,7 +96,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 onClick={handleToggle}
                 title={isToolCallsExpanded ? t.collapseToolCalls : t.expandToolCalls}
               >
-                <BrainIcon size={14} />
+                <ToolIcon size={14} />
                 <span>{t.toolCallProcess}</span>
                 {isToolCallsExpanded ? <ChevronUpIcon size={14} /> : <ChevronDownIcon size={14} />}
               </button>
