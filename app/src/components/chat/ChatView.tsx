@@ -13,16 +13,33 @@ export const ChatView: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const [isStopping, setIsStopping] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
   const messages = activeConversation?.messages ?? [];
-  
+
   // 获取正在流式传输的消息
   const streamingMessage = messages.find((m) => m.isStreaming && m.role === 'assistant');
 
+  // wheel 事件：用户主动滚轮 → 停止自动滚动
+  // scroll 事件：用户滚回底部 → 恢复自动滚动
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const onWheel = () => { isNearBottomRef.current = false; };
+
+    container.addEventListener('wheel', onWheel, { passive: true });
+    return () => container.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // 自动滚动到底部
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (container && isNearBottomRef.current) {
+      container.scrollTop = container.scrollHeight;
+    }
   }, [messages]);
 
   const autoResize = (textarea: HTMLTextAreaElement) => {
@@ -34,6 +51,7 @@ export const ChatView: React.FC = () => {
     const trimmed = inputValue.trim();
     if (!trimmed) return;
 
+    isNearBottomRef.current = true; // 发送新消息时重新启用自动滚动
     setInputValue('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -118,7 +136,7 @@ export const ChatView: React.FC = () => {
         </div>
       ) : (
         <>
-          <div className="messages">
+          <div className="messages" ref={messagesContainerRef}>
             {messages.map((msg) => (
               <MessageItem
                 key={msg.id}
@@ -127,7 +145,6 @@ export const ChatView: React.FC = () => {
                 isStopping={isStopping}
               />
             ))}
-            <div ref={messagesEndRef} />
           </div>
           <div className="input-area">{inputBox}</div>
         </>
