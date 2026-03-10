@@ -193,7 +193,7 @@ export const useSSE = () => {
   );
 
   const sendMessage = useCallback(
-    async (message: string) => {
+    async (message: string, images?: string[]) => {
       let conversationId = activeConversationId;
       
       if (!conversationId) {
@@ -206,6 +206,7 @@ export const useSSE = () => {
         id: userMsgId,
         role: 'user',
         content: message,
+        images,
         timestamp: Date.now(),
       });
 
@@ -228,6 +229,7 @@ export const useSSE = () => {
               content: m.content,
             })) ?? [],
             message,
+            images,
           }),
         });
 

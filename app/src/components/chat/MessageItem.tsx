@@ -67,7 +67,14 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   if (message.role === 'user') {
     return (
       <div className="message-wrapper msg-user">
-        <div className="msg-user-bubble">{message.content}</div>
+        {message.images && message.images.length > 0 && (
+          <div className="msg-user-images">
+            {message.images.map((src, i) => (
+              <img key={i} src={src} alt="" className="msg-user-image" />
+            ))}
+          </div>
+        )}
+        {message.content && <div className="msg-user-bubble">{message.content}</div>}
       </div>
     );
   }

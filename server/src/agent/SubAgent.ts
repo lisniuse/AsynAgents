@@ -21,7 +21,7 @@ const systemPrompt = buildSystemPrompt(
   config.persona
 );
 
-function createProvider(history: SimpleMsg[], userMessage: string): LLMProvider {
+function createProvider(history: SimpleMsg[], userMessage: string, images?: string[]): LLMProvider {
   if (config.provider === 'openai') {
     return new OpenAIProvider(
       config.openai.apiKey,
@@ -29,7 +29,8 @@ function createProvider(history: SimpleMsg[], userMessage: string): LLMProvider 
       config.openai.baseUrl,
       history,
       userMessage,
-      systemPrompt
+      systemPrompt,
+      images
     );
   }
   return new AnthropicProvider(
@@ -38,7 +39,8 @@ function createProvider(history: SimpleMsg[], userMessage: string): LLMProvider 
     config.anthropic.baseUrl,
     history,
     userMessage,
-    systemPrompt
+    systemPrompt,
+    images
   );
 }
 
@@ -59,7 +61,8 @@ export class SubAgent {
     threadId: string,
     sessionId: string,
     conversationHistory: SimpleMsg[],
-    userMessage: string
+    userMessage: string,
+    images?: string[]
   ): Promise<string> {
     this.stopped = false;
     const logger = createChildLogger(`Thread-${threadId.slice(0, 8)}`);
@@ -74,7 +77,7 @@ export class SubAgent {
 
     publish('agent_start', { threadId });
 
-    const provider = createProvider(conversationHistory, userMessage);
+    const provider = createProvider(conversationHistory, userMessage, images);
     let finalText = '';
     let thinkingText = '';
 

@@ -95,7 +95,6 @@
 
 .input-area {
   padding: 16px 24px 20px;
-  border-top: 1px solid var(--border);
   background: var(--bg);
   flex-shrink: 0;
 }
@@ -109,7 +108,7 @@
 .input-wrapper {
   display: flex;
   align-items: flex-end;
-  gap: 10px;
+  gap: 8px;
   background: var(--surface);
   border: 1px solid var(--border2);
   border-radius: 14px;
@@ -119,9 +118,39 @@
   &:focus-within {
     border-color: #444;
   }
+}
+
+.attach-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--text-3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-bottom: 2px;
+  transition: background @transition-fast, color @transition-fast, border-color @transition-fast;
+
+  &:hover {
+    background: var(--surface2);
+    color: var(--text);
+    border-color: var(--border);
+  }
+}
+
+.input-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 
   textarea {
-    flex: 1;
+    width: 100%;
     background: transparent;
     border: none;
     outline: none;
@@ -130,6 +159,7 @@
     font-size: 14px;
     line-height: 1.6;
     resize: none;
+    min-height: 100px;
     max-height: 200px;
     overflow-y: auto;
 
@@ -144,6 +174,53 @@
     &::-webkit-scrollbar-thumb {
       background: var(--border2);
       border-radius: 2px;
+    }
+  }
+}
+
+.image-previews {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.image-preview-item {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border2);
+  flex-shrink: 0;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .image-remove {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6);
+    border: none;
+    color: #fff;
+    font-size: 9px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    padding: 0;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.85);
     }
   }
 }

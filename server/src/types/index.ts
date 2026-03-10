@@ -16,6 +16,7 @@ export interface ChatRequest {
   sessionId: string;
   conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
   message: string;
+  images?: string[]; // base64 data URLs
 }
 
 export interface ChatResponse {

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/stores/appStore';
 import { useSSE } from '@/hooks/useSSE';
 import { MessageItem } from './MessageItem';
-import { SendIcon } from '@/components/icons';
+import { SendIcon, PlusIcon } from '@/components/icons';
 import { useT } from '@/i18n';
 import './ChatView.less';
 
@@ -12,7 +12,9 @@ export const ChatView: React.FC = () => {
   const { sendMessage, stopCurrentAgent } = useSSE();
   const [inputValue, setInputValue] = useState('');
   const [isStopping, setIsStopping] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
 
@@ -47,16 +49,37 @@ export const ChatView: React.FC = () => {
     textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
   };
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result as string;
+        setSelectedImages((prev) => [...prev, dataUrl]);
+      };
+      reader.readAsDataURL(file);
+    });
+    // reset so same file can be re-selected
+    e.target.value = '';
+  };
+
+  const removeImage = (idx: number) => {
+    setSelectedImages((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const handleSend = async () => {
     const trimmed = inputValue.trim();
-    if (!trimmed) return;
+    if (!trimmed && selectedImages.length === 0) return;
 
-    isNearBottomRef.current = true; // 发送新消息时重新启用自动滚动
+    isNearBottomRef.current = true;
+    const images = selectedImages.length > 0 ? [...selectedImages] : undefined;
     setInputValue('');
+    setSelectedImages([]);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-    await sendMessage(trimmed);
+    await sendMessage(trimmed, images);
   };
 
   const handleStop = async () => {
@@ -77,6 +100,8 @@ export const ChatView: React.FC = () => {
     }
   };
 
+  const canSend = inputValue.trim().length > 0 || selectedImages.length > 0;
+
   const handlePromptClick = (text: string) => {
     if (!activeConversationId) {
       createConversation();
@@ -90,21 +115,49 @@ export const ChatView: React.FC = () => {
   const inputBox = (
     <div className="input-box">
       <div className="input-wrapper">
-        <textarea
-          ref={textareaRef}
-          value={inputValue}
-          onChange={(e) => {
-            setInputValue(e.target.value);
-            autoResize(e.target);
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder={t.inputPlaceholder}
-          rows={isWelcome ? 3 : 1}
+        <button
+          className="attach-btn"
+          onClick={() => fileInputRef.current?.click()}
+          title="上传图片"
+          type="button"
+        >
+          <PlusIcon size={16} />
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: 'none' }}
+          onChange={handleImageSelect}
         />
+        <div className="input-main">
+          {selectedImages.length > 0 && (
+            <div className="image-previews">
+              {selectedImages.map((src, i) => (
+                <div key={i} className="image-preview-item">
+                  <img src={src} alt="" />
+                  <button className="image-remove" onClick={() => removeImage(i)}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <textarea
+            ref={textareaRef}
+            value={inputValue}
+            onChange={(e) => {
+              setInputValue(e.target.value);
+              autoResize(e.target);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder={t.inputPlaceholder}
+            rows={isWelcome ? 3 : 1}
+          />
+        </div>
         <button
           className="send-btn"
           onClick={handleSend}
-          disabled={!inputValue.trim()}
+          disabled={!canSend}
           title="发送"
         >
           <SendIcon size={16} />

@@ -18,6 +18,7 @@ export interface ChatRequest {
   sessionId: string;
   conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
   message: string;
+  images?: string[]; // base64 data URLs
 }
 
 export interface ChatResponse {
@@ -41,6 +42,7 @@ export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  images?: string[]; // base64 data URLs (user messages only)
   thinking?: string;
   timestamp: number;
   toolCalls?: ToolCallState[];

@@ -16,10 +16,10 @@ router.post('/chat', async (req, res) => {
     return;
   }
 
-  const { sessionId, conversationHistory, message } = req.body as ChatRequest;
+  const { sessionId, conversationHistory, message, images } = req.body as ChatRequest;
 
-  if (!sessionId || !message) {
-    res.status(400).json({ error: 'sessionId and message are required' });
+  if (!sessionId || (!message && !images?.length)) {
+    res.status(400).json({ error: 'sessionId and message (or images) are required' });
     return;
   }
 
@@ -30,9 +30,9 @@ router.post('/chat', async (req, res) => {
   // Run agent asynchronously — do not await
   const agent = new SubAgent();
   runningAgents.set(threadId, agent);
-  
+
   agent
-    .run(threadId, sessionId, conversationHistory || [], message)
+    .run(threadId, sessionId, conversationHistory || [], message, images)
     .then(() => {
       runningAgents.delete(threadId);
     })

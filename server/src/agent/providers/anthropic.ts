@@ -17,14 +17,32 @@ export class AnthropicProvider implements LLMProvider {
     baseUrl?: string,
     history: SimpleMsg[] = [],
     userMessage: string = '',
-    systemPrompt?: string
+    systemPrompt?: string,
+    images?: string[]
   ) {
     this.client = new Anthropic({ apiKey, baseURL: baseUrl });
     this.model = model;
     this.systemPrompt = systemPrompt ?? buildSystemPrompt();
+
+    let userContent: Anthropic.MessageParam['content'];
+    if (images && images.length > 0) {
+      const blocks: Anthropic.ContentBlockParam[] = images.map((dataUrl) => {
+        const [header, data] = dataUrl.split(',');
+        const mediaType = (header.match(/:(.*?);/)?.[1] ?? 'image/jpeg') as
+          'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+        return { type: 'image', source: { type: 'base64', media_type: mediaType, data } };
+      });
+      if (userMessage) blocks.push({ type: 'text', text: userMessage });
+      userContent = blocks;
+    } else {
+      userContent = userMessage;
+    }
+
     this.messages = [
       ...history.map((m) => ({ role: m.role, content: m.content })),
-      ...(userMessage ? [{ role: 'user' as const, content: userMessage }] : []),
+      ...(userMessage || (images && images.length > 0)
+        ? [{ role: 'user' as const, content: userContent }]
+        : []),
     ];
   }
 

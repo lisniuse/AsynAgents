@@ -17,14 +17,28 @@ export class OpenAIProvider implements LLMProvider {
     baseUrl: string,
     history: SimpleMsg[] = [],
     userMessage: string = '',
-    systemPrompt?: string
+    systemPrompt?: string,
+    images?: string[]
   ) {
     this.client = new OpenAI({ apiKey, baseURL: baseUrl });
     this.model = model;
+
+    type OAIUserContent = string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>;
+    let userContent: OAIUserContent = userMessage;
+    if (images && images.length > 0) {
+      const parts: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = images.map(
+        (url) => ({ type: 'image_url', image_url: { url } })
+      );
+      if (userMessage) parts.push({ type: 'text', text: userMessage });
+      userContent = parts;
+    }
+
     this.messages = [
       { role: 'system', content: systemPrompt ?? buildSystemPrompt() },
       ...history.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-      ...(userMessage ? [{ role: 'user' as const, content: userMessage }] : []),
+      ...(userMessage || (images && images.length > 0)
+        ? [{ role: 'user' as const, content: userContent }]
+        : []),
     ];
   }
 

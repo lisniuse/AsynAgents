@@ -9,7 +9,26 @@
 
 .msg-user {
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.msg-user-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: flex-end;
+  max-width: 75%;
+}
+
+.msg-user-image {
+  max-width: 240px;
+  max-height: 240px;
+  border-radius: 12px;
+  object-fit: cover;
+  display: block;
+  border: 1px solid var(--border2);
 }
 
 .msg-user-bubble {
