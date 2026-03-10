@@ -25,7 +25,12 @@ const formatTime = (timestamp: number, t: ReturnType<typeof useT>): string => {
   }
 };
 
-export const Sidebar: React.FC = () => {
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileClose }) => {
   const t = useT();
   const navigate = useNavigate();
   const {
@@ -41,11 +46,13 @@ export const Sidebar: React.FC = () => {
   const handleNewChat = async () => {
     const id = await createConversation();
     navigate(`/c/${id}`);
+    onMobileClose?.();
   };
 
   const handleSelectConversation = (id: string) => {
     setActiveConversation(id);
     navigate(`/c/${id}`);
+    onMobileClose?.();
   };
 
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -75,7 +82,7 @@ export const Sidebar: React.FC = () => {
   };
 
   return (
-    <div className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
+    <div className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
       <div className="sidebar-header">
         {!sidebarCollapsed && (
           <div className="logo">

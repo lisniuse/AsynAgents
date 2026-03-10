@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Routes, Route, useParams, useNavigate, Navigate } from 'react-router-dom';
 import { Sidebar } from '@/components/sidebar';
 import { ChatView } from '@/components/chat';
 import { useAppStore } from '@/stores/appStore';
+import { MenuIcon } from '@/components/icons';
 import './App.less';
 
 /** 同步 URL 中的 :id 到 store */
@@ -23,17 +24,29 @@ const ConversationRoute: React.FC = () => {
   return <ChatView />;
 };
 
-const Layout: React.FC = () => (
-  <div className="app">
-    <Sidebar />
-    <main className="main">
-      <Routes>
-        <Route path="/" element={<ChatView />} />
-        <Route path="/c/:id" element={<ConversationRoute />} />
-      </Routes>
-    </main>
-  </div>
-);
+const Layout: React.FC = () => {
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  return (
+    <div className="app">
+      <Sidebar mobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} />
+      {mobileSidebarOpen && (
+        <div className="mobile-overlay" onClick={() => setMobileSidebarOpen(false)} />
+      )}
+      <main className="main">
+        <div className="mobile-header">
+          <button className="mobile-menu-btn" onClick={() => setMobileSidebarOpen(true)}>
+            <MenuIcon size={20} />
+          </button>
+        </div>
+        <Routes>
+          <Route path="/" element={<ChatView />} />
+          <Route path="/c/:id" element={<ConversationRoute />} />
+        </Routes>
+      </main>
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   const { loadConversations, loadSettings } = useAppStore();
