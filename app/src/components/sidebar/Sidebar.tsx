@@ -81,14 +81,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
     setRenamingId(null);
   };
 
-  const handlePin = (id: string, pinned: boolean) => {
+  const handlePin = async (id: string, pinned: boolean) => {
     setMenuId(null);
-    updateConversation(id, { pinned: !pinned });
+    await updateConversation(id, { pinned: !pinned });
   };
 
-  const handleBold = (id: string, bold: boolean) => {
+  const handleBold = async (id: string, bold: boolean) => {
     setMenuId(null);
-    updateConversation(id, { bold: !bold });
+    await updateConversation(id, { bold: !bold });
   };
 
   const handleDeleteClick = (id: string) => {

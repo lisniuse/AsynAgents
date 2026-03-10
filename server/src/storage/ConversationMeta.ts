@@ -32,7 +32,17 @@ export async function getAllMeta(): Promise<MetaMap> {
 
 export async function updateMeta(id: string, patch: ConversationMetaEntry): Promise<ConversationMetaEntry> {
   const map = await read();
-  map[id] = { ...map[id], ...patch };
+  const next: ConversationMetaEntry = { ...map[id] };
+
+  if (patch.pinned !== undefined) {
+    next.pinned = patch.pinned;
+  }
+
+  if (patch.bold !== undefined) {
+    next.bold = patch.bold;
+  }
+
+  map[id] = next;
   await write(map);
   return map[id];
 }

@@ -50,7 +50,7 @@ interface AppState {
   deleteConversations: (ids: string[]) => void;
   setActiveConversation: (id: string | null) => void;
   updateConversationName: (id: string, name: string) => void;
-  updateConversation: (id: string, patch: Partial<Conversation>) => void;
+  updateConversation: (id: string, patch: Partial<Conversation>) => Promise<boolean>;
 
   addMessage: (conversationId: string, message: Message) => void;
   updateMessage: (conversationId: string, messageId: string, updates: Partial<Message>) => void;
@@ -221,17 +221,38 @@ export const useAppStore = create<AppState>()(
       }));
     },
 
-    updateConversation: (id, patch) => {
-      fetch(`${API_BASE}/conversations/${id}/meta`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      }).catch(console.error);
+    updateConversation: async (id, patch) => {
+      const previous = get().conversations.find((c) => c.id === id);
       set((state) => ({
         conversations: state.conversations.map((c) =>
           c.id === id ? { ...c, ...patch } : c
         ),
       }));
+
+      try {
+        const response = await fetch(`${API_BASE}/conversations/${id}/meta`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+          keepalive: true,
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to persist conversation meta');
+        }
+
+        return true;
+      } catch (err) {
+        console.error('Failed to update conversation meta:', err);
+        if (previous) {
+          set((state) => ({
+            conversations: state.conversations.map((c) =>
+              c.id === id ? previous : c
+            ),
+          }));
+        }
+        return false;
+      }
     },
 
     addMessage: (conversationId, message) => {
