@@ -28,9 +28,10 @@ const formatTime = (timestamp: number, t: ReturnType<typeof useT>): string => {
 interface SidebarProps {
   mobileOpen?: boolean;
   onMobileClose?: () => void;
+  width?: number;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileClose }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileClose, width }) => {
   const t = useT();
   const navigate = useNavigate();
   const {
@@ -127,7 +128,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
   });
 
   return (
-    <div className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
+    <div
+      className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}
+      style={width !== undefined ? { width } : undefined}
+    >
       <div className="sidebar-header">
         {!sidebarCollapsed && (
           <div className="logo">
