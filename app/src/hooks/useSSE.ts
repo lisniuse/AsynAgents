@@ -81,7 +81,8 @@ export const useSSE = () => {
           });
           currentThreadIdRef.current = event.threadId;
 
-          // Only create message if not already present (e.g. loaded from server)
+          // On replay, always reset content so events don't accumulate across
+          // multiple reconnects or React StrictMode double-invocations.
           const existing = conversation.messages.find(m => m.threadId === event.threadId);
           if (!existing) {
             const assistantMsgId = 'msg_' + Math.random().toString(36).substring(2, 15);
@@ -96,10 +97,14 @@ export const useSSE = () => {
               threadId: event.threadId,
             });
           } else {
-            // Message exists (page reload replay): mark streaming again
-            updateMessage(conversationId, existing.id, { isStreaming: true });
+            // Reset so replayed text_delta events start from a clean slate
+            updateMessage(conversationId, existing.id, {
+              isStreaming: true,
+              content: '',
+              thinking: '',
+              toolCalls: [],
+            });
           }
-          // Register agent (no AbortController after reconnect, but stop still works via HTTP)
           registerAgent(event.threadId, new AbortController());
           break;
         }
