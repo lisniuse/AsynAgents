@@ -3,3 +3,6 @@ dist/
 .env
 *.log
 .claude/
+release/
+.build/
+server/public/

@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { fileURLToPath } from 'url';
+import { resolveSystemSkillsDir } from '../utils/runtimePaths.js';
 
 export interface Skill {
   name: string;
@@ -68,12 +68,8 @@ function loadSkillsFromDir(dir: string): Skill[] {
   return skills;
 }
 
-/** Project root skills directory (system skills).
- *  SkillLoader.ts is at server/src/skills/ (or server/dist/skills/ when compiled),
- *  so 3 levels up lands at the project root.
- */
-const PROJECT_ROOT = path.resolve(fileURLToPath(new URL('../../../', import.meta.url)));
-const SYSTEM_SKILLS_DIR = path.join(PROJECT_ROOT, 'skills');
+/** System skills directory. In packaged builds, this resolves next to the executable. */
+const SYSTEM_SKILLS_DIR = resolveSystemSkillsDir();
 
 /** User skills directory. */
 const USER_SKILLS_DIR = path.join(os.homedir(), '.asynagents', 'skills');

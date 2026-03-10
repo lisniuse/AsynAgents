@@ -12,10 +12,18 @@
     "build:server": "cd server && npm run build",
     "build:app": "cd app && npm run build",
     "build": "npm run build:server && npm run build:app",
+    "build:release": "node ./scripts/build-release.mjs",
+    "build:release:win-x64": "node ./scripts/build-release.mjs --target win-x64",
+    "build:release:linux-x64": "node ./scripts/build-release.mjs --target linux-x64",
+    "build:release:macos-x64": "node ./scripts/build-release.mjs --target macos-x64",
     "start": "cd server && npm start",
     "install:all": "cd server && npm install && cd ../app && npm install",
     "test": "cd server && npx vitest run",
     "test:watch": "cd server && npx vitest",
     "test:coverage": "cd server && npx vitest run --coverage"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.10",
+    "pkg": "^5.8.1"
   }
 }

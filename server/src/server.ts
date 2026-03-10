@@ -1,7 +1,6 @@
 import cors from 'cors';
 import express from 'express';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 import { CONFIG_PATH, activeModel, config, validateConfig, workspaceDir } from '../../config.js';
 import { isPythonToolAvailable, probePythonTool } from './agent/tools.js';
 import { ExperienceScheduler } from './experience/ExperienceScheduler.js';
@@ -11,12 +10,11 @@ import configRouter from './routes/config.js';
 import conversationsRouter from './routes/conversations.js';
 import eventsRouter from './routes/events.js';
 import { loadSkills } from './skills/SkillLoader.js';
+import { resolveStaticDir } from './utils/runtimePaths.js';
 import { log } from './utils/logger.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
 const app = express();
+const staticDir = resolveStaticDir();
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -33,7 +31,7 @@ app.use((req, res, next) => {
 
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static(join(__dirname, '../public')));
+app.use(express.static(staticDir));
 
 app.use('/api', chatRouter);
 app.use('/api', eventsRouter);
@@ -42,7 +40,7 @@ app.use('/api', configRouter);
 
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/health')) return next();
-  res.sendFile(join(__dirname, '../public', 'index.html'));
+  res.sendFile(join(staticDir, 'index.html'));
 });
 
 app.get('/health', async (_req, res) => {
@@ -62,57 +60,60 @@ app.get('/health', async (_req, res) => {
   });
 });
 
-const pythonProbe = await probePythonTool();
 const experienceScheduler = new ExperienceScheduler();
-experienceScheduler.start();
 
-app.listen(config.server.port, async () => {
-  const model = activeModel();
-  const providerLabel = config.provider === 'openai'
-    ? `OpenAI-compatible [${config.openai.baseUrl}]`
-    : 'Anthropic';
+async function bootstrap(): Promise<void> {
+  const pythonProbe = await probePythonTool();
+  experienceScheduler.start();
 
-  const validation = validateConfig();
-  const skills = loadSkills();
-  const experiences = await listExperiences().catch(() => []);
+  app.listen(config.server.port, async () => {
+    const model = activeModel();
+    const providerLabel = config.provider === 'openai'
+      ? `OpenAI-compatible [${config.openai.baseUrl}]`
+      : 'Anthropic';
 
-  log.info('Asyn Agents Server started', {
-    url: `http://localhost:${config.server.port}`,
-    provider: providerLabel,
-    model,
-    configFile: CONFIG_PATH,
-    workspace: workspaceDir,
-    pythonPath: config.python.path,
-    pythonAvailable: isPythonToolAvailable(),
-    logLevel: config.logging.level,
-    configured: validation.valid,
-    skills: skills.map((skill) => skill.name),
-    experiences: experiences.length,
+    const validation = validateConfig();
+    const skills = loadSkills();
+    const experiences = await listExperiences().catch(() => []);
+
+    log.info('Asyn Agents Server started', {
+      url: `http://localhost:${config.server.port}`,
+      provider: providerLabel,
+      model,
+      configFile: CONFIG_PATH,
+      workspace: workspaceDir,
+      pythonPath: config.python.path,
+      pythonAvailable: isPythonToolAvailable(),
+      logLevel: config.logging.level,
+      configured: validation.valid,
+      skills: skills.map((skill) => skill.name),
+      experiences: experiences.length,
+    });
+
+    console.log('\nAsyn Agents Server');
+    console.log(`   URL:        http://localhost:${config.server.port}`);
+    console.log(`   Provider:   ${providerLabel}`);
+    console.log(`   Model:      ${model}`);
+    console.log(`   Config:     ${CONFIG_PATH}`);
+    console.log(`   Workspace:  ${workspaceDir}`);
+    console.log(`   Python:     ${config.python.path}`);
+    console.log(`   Python OK:  ${isPythonToolAvailable() ? 'yes' : 'no'}`);
+    console.log(`   Experiences:${String(experiences.length).padStart(4, ' ')}`);
+    if (!pythonProbe.available && pythonProbe.error) {
+      console.log(`               ${pythonProbe.error.split('\n')[0]}`);
+    }
+    if (validation.valid) {
+      console.log('   API Key:    configured');
+    } else {
+      console.log('   API Key:    missing');
+      validation.errors.forEach((error) => console.log(`               ${error}`));
+    }
+    if (skills.length > 0) {
+      console.log(`   Skills:     ${skills.map((skill) => skill.name).join(', ')}`);
+    }
+    console.log();
   });
-
-  console.log('\nAsyn Agents Server');
-  console.log(`   URL:        http://localhost:${config.server.port}`);
-  console.log(`   Provider:   ${providerLabel}`);
-  console.log(`   Model:      ${model}`);
-  console.log(`   Config:     ${CONFIG_PATH}`);
-  console.log(`   Workspace:  ${workspaceDir}`);
-  console.log(`   Python:     ${config.python.path}`);
-  console.log(`   Python OK:  ${isPythonToolAvailable() ? 'yes' : 'no'}`);
-  console.log(`   Experiences:${String(experiences.length).padStart(4, ' ')}`);
-  if (!pythonProbe.available && pythonProbe.error) {
-    console.log(`               ${pythonProbe.error.split('\n')[0]}`);
-  }
-  if (validation.valid) {
-    console.log('   API Key:    configured');
-  } else {
-    console.log('   API Key:    missing');
-    validation.errors.forEach((error) => console.log(`               ${error}`));
-  }
-  if (skills.length > 0) {
-    console.log(`   Skills:     ${skills.map((skill) => skill.name).join(', ')}`);
-  }
-  console.log();
-});
+}
 
 process.on('SIGTERM', () => {
   experienceScheduler.stop();
@@ -124,4 +125,12 @@ process.on('SIGINT', () => {
   experienceScheduler.stop();
   log.info('SIGINT received, shutting down gracefully');
   process.exit(0);
+});
+
+bootstrap().catch((error) => {
+  log.error('Failed to bootstrap server', {
+    error: (error as Error).message,
+    stack: (error as Error).stack,
+  });
+  process.exit(1);
 });
