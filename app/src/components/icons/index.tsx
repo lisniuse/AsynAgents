@@ -291,6 +291,20 @@ export const PanelLeftIcon: React.FC<IconProps> = ({ size = 18, className, style
   </svg>
 );
 
+export const PinIcon: React.FC<IconProps> = ({ size = 12, className, style }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} style={style}>
+    <path d="M12 2l2.4 6.4L21 9l-5 4.9 1.2 6.8L12 17.3l-5.2 3.4L8 13.9 3 9l6.6-.6z" />
+  </svg>
+);
+
+export const MoreHorizontalIcon: React.FC<IconProps> = ({ size = 16, className, style }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} style={style}>
+    <circle cx="5" cy="12" r="1.5" />
+    <circle cx="12" cy="12" r="1.5" />
+    <circle cx="19" cy="12" r="1.5" />
+  </svg>
+);
+
 export const MenuIcon: React.FC<IconProps> = ({ size = 18, className, style }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} style={style}>
     <line x1="3" y1="6" x2="21" y2="6" />

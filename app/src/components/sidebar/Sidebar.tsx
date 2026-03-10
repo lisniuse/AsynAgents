@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/appStore';
-import { PlusIcon, MessageIcon, TrashIcon, BoltIcon, SettingsIcon, PanelLeftIcon, ListManageIcon } from '@/components/icons';
+import { PlusIcon, BoltIcon, SettingsIcon, PanelLeftIcon, ListManageIcon, MoreHorizontalIcon, PinIcon } from '@/components/icons';
 import { ThemeToggle } from './ThemeToggle';
 import { SettingsModal } from '@/components/settings';
 import { ConversationsManager } from './ConversationsManager';
@@ -39,6 +39,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
     createConversation,
     deleteConversation,
     setActiveConversation,
+    updateConversationName,
+    updateConversation,
     sidebarCollapsed,
     setSidebarCollapsed,
   } = useAppStore();
@@ -55,31 +57,74 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
     onMobileClose?.();
   };
 
-  const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [popoverPos, setPopoverPos] = useState<{ top: number; right: number } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showManager, setShowManager] = useState(false);
 
+  // 更多菜单
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+
+  // 重命名弹窗
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const renameInputRef = React.useRef<HTMLInputElement>(null);
+
+  // 删除确认
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
   useEffect(() => {
-    if (!confirmId) return;
-    const handler = () => setConfirmId(null);
+    if (!menuId) return;
+    const handler = () => setMenuId(null);
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [confirmId]);
+  }, [menuId]);
 
-  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
+  const handleMoreClick = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setPopoverPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
-    setConfirmId(id);
+    setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    setMenuId(menuId === id ? null : id);
+  };
+
+  const handleStartRename = (id: string, name: string) => {
+    setMenuId(null);
+    setRenameValue(name);
+    setRenamingId(id);
+  };
+
+  const handleRenameSubmit = () => {
+    if (renamingId && renameValue.trim()) updateConversationName(renamingId, renameValue.trim());
+    setRenamingId(null);
+  };
+
+  const handlePin = (id: string, pinned: boolean) => {
+    setMenuId(null);
+    updateConversation(id, { pinned: !pinned });
+  };
+
+  const handleBold = (id: string, bold: boolean) => {
+    setMenuId(null);
+    updateConversation(id, { bold: !bold });
+  };
+
+  const handleDeleteClick = (id: string) => {
+    setMenuId(null);
+    setConfirmDeleteId(id);
   };
 
   const handleConfirmDelete = () => {
-    if (confirmId) {
-      deleteConversation(confirmId);
-      setConfirmId(null);
+    if (confirmDeleteId) {
+      deleteConversation(confirmDeleteId);
+      setConfirmDeleteId(null);
     }
   };
+
+  // 置顶的排在前面
+  const sortedConversations = [...conversations].sort((a, b) => {
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    return 0;
+  });
 
   return (
     <div className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
@@ -126,26 +171,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
             {conversations.length === 0 ? (
               <div className="empty-conv">{t.noConversations}</div>
             ) : (
-              conversations.map((conv) => (
+              sortedConversations.map((conv) => (
                 <div
                   key={conv.id}
                   className={`conv-item ${activeConversationId === conv.id ? 'active' : ''}`}
                   onClick={() => handleSelectConversation(conv.id)}
                 >
-                  <MessageIcon size={18} className="conv-item-icon" />
                   <div className="conv-item-content">
-                    <div className="conv-name">{conv.name}</div>
-                    <div className="conv-time">{formatTime(conv.updatedAt, t)}</div>
+                    <div className={`conv-name ${conv.bold ? 'conv-name-bold' : ''}`}>
+                      {conv.pinned && <PinIcon size={10} className="conv-pin-icon" />}
+                      {conv.name}
+                    </div>
                   </div>
-                  <div className="conv-delete-wrap">
-                    <button
-                      className="conv-delete"
-                      onClick={(e) => handleDeleteClick(e, conv.id)}
-                      title={t.delete}
-                    >
-                      <TrashIcon size={14} />
-                    </button>
-                  </div>
+                  <button
+                    className="conv-more"
+                    onClick={(e) => handleMoreClick(e, conv.id)}
+                    title="更多"
+                  >
+                    <MoreHorizontalIcon size={14} />
+                  </button>
                 </div>
               ))
             )}
@@ -160,18 +204,75 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
         </>
       )}
 
-      {confirmId && popoverPos && createPortal(
+      {/* 更多菜单 */}
+      {menuId && menuPos && createPortal(
         <div
-          className="delete-popover"
-          style={{ top: popoverPos.top, right: popoverPos.right }}
+          className="conv-menu"
+          style={{ top: menuPos.top, right: menuPos.right }}
           onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
         >
-          <div className="delete-popover-arrow" />
-          <div className="delete-popover-text">{t.confirmDelete}</div>
-          <div className="delete-popover-actions">
-            <button className="popover-cancel" onClick={() => setConfirmId(null)}>{t.cancel}</button>
-            <button className="popover-confirm" onClick={handleConfirmDelete}>{t.delete}</button>
+          {(() => {
+            const conv = conversations.find((c) => c.id === menuId);
+            if (!conv) return null;
+            return (
+              <>
+                <button className="conv-menu-item" onClick={() => handleStartRename(conv.id, conv.name)}>
+                  {t.rename}
+                </button>
+                <button className="conv-menu-item" onClick={() => handlePin(conv.id, !!conv.pinned)}>
+                  {conv.pinned ? t.unpin : t.pin}
+                </button>
+                <button className="conv-menu-item" onClick={() => handleBold(conv.id, !!conv.bold)}>
+                  {conv.bold ? t.unbold : t.bold}
+                </button>
+                <div className="conv-menu-divider" />
+                <button className="conv-menu-item conv-menu-item-danger" onClick={() => handleDeleteClick(conv.id)}>
+                  {t.delete}
+                </button>
+              </>
+            );
+          })()}
+        </div>,
+        document.body
+      )}
+
+      {/* 删除确认 */}
+      {confirmDeleteId && createPortal(
+        <div
+          className="delete-confirm-mask"
+          onMouseDown={() => setConfirmDeleteId(null)}
+        >
+          <div className="delete-confirm-dialog" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="delete-confirm-text">{t.confirmDelete}</div>
+            <div className="delete-popover-actions">
+              <button className="popover-cancel" onClick={() => setConfirmDeleteId(null)}>{t.cancel}</button>
+              <button className="popover-confirm" onClick={handleConfirmDelete}>{t.delete}</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 重命名弹窗 */}
+      {renamingId && createPortal(
+        <div className="delete-confirm-mask" onMouseDown={() => setRenamingId(null)}>
+          <div className="rename-dialog" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="rename-dialog-title">{t.rename}</div>
+            <input
+              ref={renameInputRef}
+              className="rename-dialog-input"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleRenameSubmit();
+                if (e.key === 'Escape') setRenamingId(null);
+              }}
+              autoFocus
+            />
+            <div className="delete-popover-actions">
+              <button className="popover-cancel" onClick={() => setRenamingId(null)}>{t.cancel}</button>
+              <button className="popover-confirm" style={{ background: 'var(--accent-soft)', borderColor: 'var(--accent)', color: 'var(--accent)' }} onClick={handleRenameSubmit}>{t.save}</button>
+            </div>
           </div>
         </div>,
         document.body

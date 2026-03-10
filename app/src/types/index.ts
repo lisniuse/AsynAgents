@@ -64,6 +64,8 @@ export interface Conversation {
   createdAt: number;
   updatedAt: number;
   messages: Message[];
+  pinned?: boolean;
+  bold?: boolean;
 }
 
 export interface AgentState {

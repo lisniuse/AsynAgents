@@ -10,6 +10,7 @@ export interface AppSettings {
   openai: { apiKey: string; baseUrl: string; model: string };
   workspace: string;
   ui: { showToolCalls: boolean };
+  persona: { aiName: string; userName: string; personality: string };
 }
 
 interface AppState {
@@ -34,6 +35,7 @@ interface AppState {
   deleteConversations: (ids: string[]) => void;
   setActiveConversation: (id: string | null) => void;
   updateConversationName: (id: string, name: string) => void;
+  updateConversation: (id: string, patch: Partial<Conversation>) => void;
 
   addMessage: (conversationId: string, message: Message) => void;
   updateMessage: (conversationId: string, messageId: string, updates: Partial<Message>) => void;
@@ -186,6 +188,19 @@ export const useAppStore = create<AppState>()(
       set((state) => ({
         conversations: state.conversations.map((c) =>
           c.id === id ? { ...c, name, updatedAt: Date.now() } : c
+        ),
+      }));
+    },
+
+    updateConversation: (id, patch) => {
+      fetch(`${API_BASE}/conversations/${id}/meta`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      }).catch(console.error);
+      set((state) => ({
+        conversations: state.conversations.map((c) =>
+          c.id === id ? { ...c, ...patch } : c
         ),
       }));
     },

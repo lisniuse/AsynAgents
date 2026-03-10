@@ -17,7 +17,8 @@ const MAX_ITERATIONS = 20;
 const skills = loadSkills();
 const systemPrompt = buildSystemPrompt(
   buildSkillsPrompt(skills),
-  config.ui?.userLanguage ?? 'auto'
+  config.ui?.userLanguage ?? 'auto',
+  config.persona
 );
 
 function createProvider(history: SimpleMsg[], userMessage: string): LLMProvider {

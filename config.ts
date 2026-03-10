@@ -34,6 +34,11 @@ export interface Config {
     language: 'zh' | 'en';
     userLanguage: 'zh' | 'en' | 'auto';
   };
+  persona: {
+    aiName: string;
+    userName: string;
+    personality: string;
+  };
 }
 
 export const CONFIG_DIR = join(homedir(), '.asynagents');
@@ -68,6 +73,11 @@ const defaultConfig: Config = {
     language: 'zh',
     userLanguage: 'auto',
   },
+  persona: {
+    aiName: '',
+    userName: '',
+    personality: '',
+  },
 };
 
 function loadConfig(): Config {
@@ -92,6 +102,7 @@ function loadConfig(): Config {
       app: { ...defaultConfig.app, ...userConfig.app },
       logging: { ...defaultConfig.logging, ...userConfig.logging },
       ui: { ...defaultConfig.ui, ...userConfig.ui },
+      persona: { ...defaultConfig.persona, ...userConfig.persona },
     };
   } catch {
     return { ...defaultConfig };

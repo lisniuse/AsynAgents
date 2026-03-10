@@ -28,14 +28,18 @@
   display: flex;
 }
 
+// 桌面：grid 两列，头像跨两行，label 和 content 在第二列
 .msg-assistant-content {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  grid-template-rows: auto 1fr;
+  column-gap: 14px;
   flex: 1;
 }
 
 .agent-avatar {
+  grid-column: 1;
+  grid-row: 1 / 3;
   width: 32px;
   height: 32px;
   background: linear-gradient(135deg, #d97706, #f59e0b);
@@ -48,18 +52,22 @@
   margin-top: 2px;
 }
 
-.msg-content {
-  flex: 1;
-  min-width: 0;
-}
-
 .msg-label {
+  grid-column: 2;
+  grid-row: 1;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-3);
   margin-bottom: 6px;
   letter-spacing: 0.03em;
   text-transform: uppercase;
+  align-self: center;
+}
+
+.msg-content {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
 }
 
 // 思考过程折叠区域
@@ -216,13 +224,15 @@
     margin: 16px 0;
   }
 
+  .table-wrapper {
+    overflow-x: auto;
+    margin-bottom: 10px;
+    -webkit-overflow-scrolling: touch;
+  }
+
   table {
     border-collapse: collapse;
-    width: 100%;
-    max-width: 100%;
-    margin-bottom: 10px;
-    display: block;
-    overflow-x: auto;
+    min-width: 100%;
   }
 
   th,
@@ -230,6 +240,7 @@
     border: 1px solid var(--border2);
     padding: 8px 12px;
     text-align: left;
+    white-space: nowrap;
   }
 
   th {
@@ -356,5 +367,27 @@
 @media (max-width: 640px) {
   .message-wrapper {
     padding: 0 12px;
+  }
+
+  // 移动端：头像+label 第一行，content 第二行占满全宽
+  .msg-assistant-content {
+    grid-template-rows: auto auto;
+  }
+
+  .agent-avatar {
+    grid-row: 1;
+    margin-top: 0;
+    align-self: center;
+  }
+
+  .msg-label {
+    grid-row: 1;
+    margin-bottom: 0;
+  }
+
+  .msg-content {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin-top: 8px;
   }
 }

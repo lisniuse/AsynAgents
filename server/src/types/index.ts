@@ -61,4 +61,6 @@ export interface StoredConversation {
   createdAt: number;
   updatedAt: number;
   messages: StoredMessage[];
+  pinned?: boolean;
+  bold?: boolean;
 }

@@ -21,15 +21,17 @@ marked.setOptions({
 
 const renderMarkdown = (content: string): string => {
   const tokens = marked.lexer(content);
-  
+
   return tokens.map((token) => {
     if (token.type === 'code') {
       const codeToken = token as marked.Tokens.Code;
       const highlighted = codeToken.lang && hljs.getLanguage(codeToken.lang)
         ? hljs.highlight(codeToken.text, { language: codeToken.lang }).value
         : hljs.highlightAuto(codeToken.text).value;
-      
       return `<pre><div class="code-header"><span class="code-lang">${codeToken.lang || 'text'}</span></div><code>${highlighted}</code></pre>`;
+    }
+    if (token.type === 'table') {
+      return `<div class="table-wrapper">${marked.parser([token] as marked.Token[])}</div>`;
     }
     return marked.parser([token] as marked.Token[]);
   }).join('');
@@ -76,8 +78,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         <div className="agent-avatar">
           <BoltIcon size={16} />
         </div>
+        <div className="msg-label">{t.assistant}</div>
         <div className="msg-content">
-          <div className="msg-label">{t.assistant}</div>
 
           {/* 工具调用折叠区域 */}
           {message.toolCalls && message.toolCalls.length > 0 && (

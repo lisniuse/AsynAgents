@@ -102,10 +102,26 @@ function buildUserLanguageSection(userLanguage: string): string {
   return '';
 }
 
+interface PersonaOptions {
+  aiName?: string;
+  userName?: string;
+  personality?: string;
+}
+
+function buildPersonaSection(persona: PersonaOptions): string {
+  const lines: string[] = [];
+  if (persona.aiName?.trim()) lines.push(`- Your name is **${persona.aiName.trim()}**. Use this name when introducing yourself.`);
+  if (persona.userName?.trim()) lines.push(`- Address the user as **${persona.userName.trim()}**.`);
+  if (persona.personality?.trim()) lines.push(`- Personality / tone: ${persona.personality.trim()}`);
+  if (lines.length === 0) return '';
+  return '\n\n## Persona\n' + lines.join('\n');
+}
+
 /** Build the full system prompt, optionally appending skills and user language preference. */
-export function buildSystemPrompt(skillsSection?: string, userLanguage?: string): string {
+export function buildSystemPrompt(skillsSection?: string, userLanguage?: string, persona?: PersonaOptions): string {
   const langSection = userLanguage ? buildUserLanguageSection(userLanguage) : '';
-  return BASE_SYSTEM_PROMPT + langSection + (skillsSection ?? '');
+  const personaSection = persona ? buildPersonaSection(persona) : '';
+  return BASE_SYSTEM_PROMPT + personaSection + langSection + (skillsSection ?? '');
 }
 
 /** @deprecated Use buildSystemPrompt() instead */
