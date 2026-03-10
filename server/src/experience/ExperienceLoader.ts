@@ -1,5 +1,6 @@
 import { config } from '../../../config.js';
 import { listExperiences, type ExperienceRecord } from './ExperienceStorage.js';
+import { listCatalogStates } from '../storage/FeatureToggleStorage.js';
 
 export function buildExperiencePrompt(experiences: ExperienceRecord[]): string {
   if (experiences.length === 0) {
@@ -26,5 +27,9 @@ export function buildExperiencePrompt(experiences: ExperienceRecord[]): string {
 }
 
 export async function loadExperiences(): Promise<ExperienceRecord[]> {
-  return listExperiences();
+  const [experiences, toggleState] = await Promise.all([
+    listExperiences(),
+    listCatalogStates('experiences'),
+  ]);
+  return experiences.filter((experience) => (toggleState[experience.fileName] ?? true));
 }

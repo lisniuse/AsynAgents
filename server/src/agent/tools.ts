@@ -8,6 +8,7 @@ import type OpenAI from 'openai';
 import { config, workspaceDir } from '../../../config.js';
 import { getSkillContent } from '../skills/SkillLoader.js';
 import { getExperienceContent } from '../experience/ExperienceStorage.js';
+import { isCatalogItemEnabled } from '../storage/FeatureToggleStorage.js';
 
 const execAsync = promisify(exec);
 const MAX_OUTPUT = 12000;
@@ -258,7 +259,7 @@ export async function executeTool(
 
     case 'get_skill': {
       const skillName = input['name'] as string;
-      const content = getSkillContent(skillName);
+      const content = await getSkillContent(skillName);
       if (content === null) {
         return `Skill "${skillName}" not found. Use the available skills list in the system prompt.`;
       }
@@ -267,6 +268,9 @@ export async function executeTool(
 
     case 'get_experience': {
       const experienceName = input['name'] as string;
+      if (!(await isCatalogItemEnabled('experiences', experienceName.endsWith('.md') ? experienceName : `${experienceName}.md`))) {
+        return `Experience "${experienceName}" is disabled.`;
+      }
       const content = await getExperienceContent(experienceName);
       if (content === null) {
         return `Experience "${experienceName}" not found. Use the available experiences list in the system prompt.`;

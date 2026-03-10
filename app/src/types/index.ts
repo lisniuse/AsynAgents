@@ -79,3 +79,18 @@ export interface AgentState {
   isRunning: boolean;
   abortController?: AbortController;
 }
+
+export interface SkillItem {
+  name: string;
+  description: string;
+  source: 'system' | 'user';
+  enabled: boolean;
+}
+
+export interface ExperienceItem {
+  fileName: string;
+  title: string;
+  summary: string;
+  keywords: string[];
+  enabled: boolean;
+}

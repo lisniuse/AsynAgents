@@ -6,6 +6,7 @@ import { isPythonToolAvailable, probePythonTool } from './agent/tools.js';
 import { ExperienceScheduler } from './experience/ExperienceScheduler.js';
 import { listExperiences } from './experience/ExperienceStorage.js';
 import chatRouter from './routes/chat.js';
+import catalogRouter from './routes/catalog.js';
 import configRouter from './routes/config.js';
 import conversationsRouter from './routes/conversations.js';
 import eventsRouter from './routes/events.js';
@@ -29,17 +30,38 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
+
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static(staticDir));
+app.use(express.static(staticDir, {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  },
+}));
 
 app.use('/api', chatRouter);
+app.use('/api', catalogRouter);
 app.use('/api', eventsRouter);
 app.use('/api', conversationsRouter);
 app.use('/api', configRouter);
 
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/health')) return next();
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(join(staticDir, 'index.html'));
 });
 
@@ -76,7 +98,7 @@ async function bootstrap(): Promise<void> {
     const hostForDisplay = listenHost || 'localhost';
 
     const validation = validateConfig();
-    const skills = loadSkills();
+    const skills = await loadSkills();
     const experiences = await listExperiences().catch(() => []);
 
     log.info('Asyn Agents Server started', {

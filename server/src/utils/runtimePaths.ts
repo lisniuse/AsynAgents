@@ -17,8 +17,13 @@ function getRuntimeBaseDir(): string {
 
 export function resolveStaticDir(): string {
   const runtimePublic = join(getRuntimeBaseDir(), 'public');
-  if (existsSync(runtimePublic)) {
+  if (isPackagedRuntime() && existsSync(runtimePublic)) {
     return runtimePublic;
+  }
+
+  const appDist = join(REPO_ROOT, 'app', 'dist');
+  if (existsSync(appDist)) {
+    return appDist;
   }
 
   const generatedServerPublic = join(REPO_ROOT, 'server', 'public');
@@ -26,7 +31,7 @@ export function resolveStaticDir(): string {
     return generatedServerPublic;
   }
 
-  return join(REPO_ROOT, 'app', 'dist');
+  return runtimePublic;
 }
 
 export function resolveSystemSkillsDir(): string {

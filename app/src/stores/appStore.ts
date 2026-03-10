@@ -1,11 +1,20 @@
 import { create } from 'zustand';
-import type { Message, Conversation, ToolCallState, ThemeMode, AgentState } from '@/types';
+import type {
+  Message,
+  Conversation,
+  ToolCallState,
+  ThemeMode,
+  AgentState,
+  SkillItem,
+  ExperienceItem,
+} from '@/types';
 import { getStoredTheme, setStoredTheme, applyTheme } from '@/utils/theme';
 
 const API_BASE = '/api';
 
 export interface AppSettings {
   provider: string;
+  server?: { hostname?: string; port?: number };
   python: { path: string };
   anthropic: { apiKey: string; baseUrl?: string; model: string };
   openai: { apiKey: string; baseUrl: string; model: string };
@@ -32,8 +41,13 @@ interface AppState {
   effectiveTheme: 'light' | 'dark';
 
   settings: AppSettings | null;
+  skills: SkillItem[];
+  experiences: ExperienceItem[];
   loadSettings: () => Promise<void>;
   saveSettings: (patch: Partial<AppSettings>) => Promise<ConfigSaveResult | null>;
+  loadCatalog: () => Promise<void>;
+  toggleSkill: (name: string, enabled: boolean) => Promise<boolean>;
+  toggleExperience: (fileName: string, enabled: boolean) => Promise<boolean>;
 
   conversationsLoaded: boolean;
 
@@ -87,6 +101,8 @@ export const useAppStore = create<AppState>()(
     },
 
     settings: null,
+    skills: [],
+    experiences: [],
     sidebarCollapsed: false,
     setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
 
@@ -117,6 +133,78 @@ export const useAppStore = create<AppState>()(
       } catch (err) {
         console.error('Failed to save settings:', err);
         return null;
+      }
+    },
+
+    loadCatalog: async () => {
+      try {
+        const [skillsRes, experiencesRes] = await Promise.all([
+          fetch(`${API_BASE}/skills`),
+          fetch(`${API_BASE}/experiences`),
+        ]);
+
+        if (!skillsRes.ok || !experiencesRes.ok) {
+          return;
+        }
+
+        const [skills, experiences] = await Promise.all([
+          skillsRes.json() as Promise<SkillItem[]>,
+          experiencesRes.json() as Promise<ExperienceItem[]>,
+        ]);
+
+        set({ skills, experiences });
+      } catch (err) {
+        console.error('Failed to load catalog:', err);
+      }
+    },
+
+    toggleSkill: async (name, enabled) => {
+      const previous = get().skills;
+      set((state) => ({
+        skills: state.skills.map((skill) =>
+          skill.name === name ? { ...skill, enabled } : skill
+        ),
+      }));
+
+      try {
+        const res = await fetch(`${API_BASE}/skills/${encodeURIComponent(name)}/state`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        });
+        if (!res.ok) {
+          throw new Error('Failed to persist skill state');
+        }
+        return true;
+      } catch (err) {
+        console.error('Failed to toggle skill:', err);
+        set({ skills: previous });
+        return false;
+      }
+    },
+
+    toggleExperience: async (fileName, enabled) => {
+      const previous = get().experiences;
+      set((state) => ({
+        experiences: state.experiences.map((experience) =>
+          experience.fileName === fileName ? { ...experience, enabled } : experience
+        ),
+      }));
+
+      try {
+        const res = await fetch(`${API_BASE}/experiences/${encodeURIComponent(fileName)}/state`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        });
+        if (!res.ok) {
+          throw new Error('Failed to persist experience state');
+        }
+        return true;
+      } catch (err) {
+        console.error('Failed to toggle experience:', err);
+        set({ experiences: previous });
+        return false;
       }
     },
 

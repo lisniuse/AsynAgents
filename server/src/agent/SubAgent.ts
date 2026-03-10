@@ -23,10 +23,8 @@ function toLogMeta(data: unknown): Record<string, unknown> | undefined {
 // 0 means unlimited; fall back to 100 as a safety cap when unlimited
 const MAX_ITERATIONS = config.maxIterations > 0 ? config.maxIterations : 100;
 
-// Load skills once at module level (sync reads at startup)
-const skills = loadSkills();
 async function createProvider(history: SimpleMsg[], userMessage: string, images?: string[]): Promise<LLMProvider> {
-  const experiences = await loadExperiences();
+  const [skills, experiences] = await Promise.all([loadSkills(), loadExperiences()]);
   const systemPrompt = buildSystemPrompt(
     `${buildSkillsPrompt(skills)}${buildExperiencePrompt(experiences)}`,
     config.ui?.userLanguage ?? 'auto',

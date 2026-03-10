@@ -9,6 +9,8 @@ export interface Skill {
   content: string;
   /** Directory the skill was loaded from (for resolving relative paths in content) */
   dir: string;
+  enabled: boolean;
+  source: 'system' | 'user';
 }
 
 /** Parse YAML front matter from a SKILL.md string. Returns { meta, body }. */
@@ -29,7 +31,7 @@ function parseFrontMatter(raw: string): { meta: Record<string, string>; body: st
 }
 
 /** Load all skills from a directory (each subdirectory = one skill). */
-function loadSkillsFromDir(dir: string): Skill[] {
+function loadSkillsFromDir(dir: string, source: 'system' | 'user'): Skill[] {
   if (!fs.existsSync(dir)) return [];
 
   const skills: Skill[] = [];
@@ -59,6 +61,8 @@ function loadSkillsFromDir(dir: string): Skill[] {
         description: meta['description'] ?? '',
         content: body.trim(),
         dir: skillDir,
+        enabled: true,
+        source,
       });
     } catch {
       // Skip malformed skill files
@@ -74,27 +78,38 @@ const SYSTEM_SKILLS_DIR = resolveSystemSkillsDir();
 /** User skills directory. */
 const USER_SKILLS_DIR = path.join(os.homedir(), '.asynagents', 'skills');
 
-/** Cached skill map (loaded once at startup). */
-let skillCache: Map<string, Skill> | null = null;
-
-/** Load all skills (system + user). User skills override system skills with same name. */
-export function loadSkills(): Skill[] {
-  const systemSkills = loadSkillsFromDir(SYSTEM_SKILLS_DIR);
-  const userSkills = loadSkillsFromDir(USER_SKILLS_DIR);
+async function mergeSkills(): Promise<Skill[]> {
+  const { listCatalogStates } = await import('../storage/FeatureToggleStorage.js');
+  const systemSkills = loadSkillsFromDir(SYSTEM_SKILLS_DIR, 'system');
+  const userSkills = loadSkillsFromDir(USER_SKILLS_DIR, 'user');
+  const toggleState = await listCatalogStates('skills');
 
   // Merge: user skills override system skills by name
   const map = new Map<string, Skill>();
   for (const skill of systemSkills) map.set(skill.name, skill);
   for (const skill of userSkills) map.set(skill.name, skill);
 
-  skillCache = map;
-  return [...map.values()];
+  return [...map.values()].map((skill) => ({
+    ...skill,
+    enabled: toggleState[skill.name] ?? true,
+  }));
+}
+
+/** Load enabled skills (system + user). User skills override system skills with same name. */
+export async function loadSkills(): Promise<Skill[]> {
+  const skills = await mergeSkills();
+  return skills.filter((skill) => skill.enabled);
+}
+
+/** List all skills for management UIs. */
+export async function listSkills(): Promise<Skill[]> {
+  return mergeSkills();
 }
 
 /** Get full content of a skill by name. Returns null if not found. */
-export function getSkillContent(name: string): string | null {
-  if (!skillCache) loadSkills();
-  const skill = skillCache!.get(name);
+export async function getSkillContent(name: string): Promise<string | null> {
+  const skills = await loadSkills();
+  const skill = skills.find((entry) => entry.name === name);
   return skill ? skill.content : null;
 }
 

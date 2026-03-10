@@ -1,9 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '@/stores/appStore';
 import type { AppSettings, ConfigSaveResult } from '@/stores/appStore';
+import type { ExperienceItem, SkillItem } from '@/types';
 import { useT } from '@/i18n';
-import { BoltIcon, ToolIcon, MonitorIcon, BrainIcon } from '@/components/icons';
+import {
+  BoltIcon,
+  ToolIcon,
+  MonitorIcon,
+  BrainIcon,
+  ListManageIcon,
+} from '@/components/icons';
 import './SettingsModal.less';
 
 interface SettingsModalProps {
@@ -11,32 +18,51 @@ interface SettingsModalProps {
 }
 
 type UiSettings = NonNullable<AppSettings['ui']>;
+type Section = 'model' | 'workspace' | 'knowledge' | 'ui' | 'persona';
 
 const DEFAULT_UI: UiSettings = { showToolCalls: true, language: 'zh', userLanguage: 'auto' };
 const DEFAULT_PERSONA = { aiName: '', userName: '', personality: '' };
 const DEFAULT_PYTHON = { path: 'python' };
 
-type Section = 'model' | 'workspace' | 'ui' | 'persona';
+function sortSkills(skills: SkillItem[]): SkillItem[] {
+  return [...skills].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function sortExperiences(experiences: ExperienceItem[]): ExperienceItem[] {
+  return [...experiences].sort((a, b) => b.fileName.localeCompare(a.fileName));
+}
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const t = useT();
-  const { settings, saveSettings } = useAppStore();
+  const {
+    settings,
+    saveSettings,
+    skills,
+    experiences,
+    loadCatalog,
+    toggleSkill,
+    toggleExperience,
+  } = useAppStore();
   const [form, setForm] = useState<AppSettings | null>(null);
   const [pythonStatus, setPythonStatus] = useState<{ available: boolean; path?: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [activeSection, setActiveSection] = useState<Section>('model');
+  const [togglingSkill, setTogglingSkill] = useState<string | null>(null);
+  const [togglingExperience, setTogglingExperience] = useState<string | null>(null);
 
   useEffect(() => {
-    if (settings) {
-      const copy = JSON.parse(JSON.stringify(settings));
-      if (!copy.python) copy.python = { ...DEFAULT_PYTHON };
-      else copy.python = { ...DEFAULT_PYTHON, ...copy.python };
-      if (!copy.ui) copy.ui = { ...DEFAULT_UI };
-      else copy.ui = { ...DEFAULT_UI, ...copy.ui };
-      setForm(copy);
-    }
+    if (!settings) return;
+    const copy = JSON.parse(JSON.stringify(settings)) as AppSettings;
+    copy.python = { ...DEFAULT_PYTHON, ...copy.python };
+    copy.ui = { ...DEFAULT_UI, ...copy.ui };
+    copy.persona = { ...DEFAULT_PERSONA, ...copy.persona };
+    setForm(copy);
   }, [settings]);
+
+  useEffect(() => {
+    void loadCatalog();
+  }, [loadCatalog]);
 
   const refreshPythonStatus = (data?: { pythonAvailable?: boolean; pythonPath?: string } | null) => {
     if (!data) return;
@@ -70,19 +96,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
   const ui = form.ui ?? DEFAULT_UI;
   const persona = form.persona ?? DEFAULT_PERSONA;
-  const setPersonaField = (k: keyof typeof DEFAULT_PERSONA, v: string) =>
-    setForm({ ...form, persona: { ...persona, [k]: v } });
 
-  const setProvider = (v: string) => setForm({ ...form, provider: v });
-  const setAnthropicField = (k: keyof AppSettings['anthropic'], v: string) =>
-    setForm({ ...form, anthropic: { ...form.anthropic, [k]: v } });
-  const setOpenAIField = (k: keyof AppSettings['openai'], v: string) =>
-    setForm({ ...form, openai: { ...form.openai, [k]: v } });
-  const setPythonPath = (v: string) =>
-    setForm({ ...form, python: { ...form.python, path: v } });
-  const setWorkspace = (v: string) => setForm({ ...form, workspace: v });
-  const setUiField = (patch: Partial<typeof DEFAULT_UI>) =>
+  const setPersonaField = (key: keyof typeof DEFAULT_PERSONA, value: string) => {
+    setForm({ ...form, persona: { ...persona, [key]: value } });
+  };
+
+  const setProvider = (value: string) => setForm({ ...form, provider: value });
+  const setAnthropicField = (key: keyof AppSettings['anthropic'], value: string) => {
+    setForm({ ...form, anthropic: { ...form.anthropic, [key]: value } });
+  };
+  const setOpenAIField = (key: keyof AppSettings['openai'], value: string) => {
+    setForm({ ...form, openai: { ...form.openai, [key]: value } });
+  };
+  const setPythonPath = (value: string) => {
+    setForm({ ...form, python: { ...form.python, path: value } });
+  };
+  const setWorkspace = (value: string) => setForm({ ...form, workspace: value });
+  const setUiField = (patch: Partial<UiSettings>) => {
     setForm({ ...form, ui: { ...ui, ...patch } });
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -90,27 +122,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setSaving(false);
     refreshPythonStatus(result as ConfigSaveResult | null);
     setSaved(true);
-    setTimeout(() => onClose(), 800);
+    window.setTimeout(() => onClose(), 800);
+  };
+
+  const handleToggleSkill = async (skill: SkillItem) => {
+    setTogglingSkill(skill.name);
+    await toggleSkill(skill.name, !skill.enabled);
+    setTogglingSkill(null);
+  };
+
+  const handleToggleExperience = async (experience: ExperienceItem) => {
+    setTogglingExperience(experience.fileName);
+    await toggleExperience(experience.fileName, !experience.enabled);
+    setTogglingExperience(null);
   };
 
   const navItems: { key: Section; label: string; icon: React.ReactNode }[] = [
-    { key: 'model',     label: t.modelConfig,      icon: <BoltIcon size={15} /> },
-    { key: 'workspace', label: t.workspaceSection,  icon: <ToolIcon size={15} /> },
-    { key: 'ui',        label: t.uiSection,         icon: <MonitorIcon size={15} /> },
-    { key: 'persona',   label: t.personaSection,    icon: <BrainIcon size={15} /> },
+    { key: 'model', label: t.modelConfig, icon: <BoltIcon size={15} /> },
+    { key: 'workspace', label: t.workspaceSection, icon: <ToolIcon size={15} /> },
+    { key: 'knowledge', label: t.knowledgeSection, icon: <ListManageIcon size={15} /> },
+    { key: 'ui', label: t.uiSection, icon: <MonitorIcon size={15} /> },
+    { key: 'persona', label: t.personaSection, icon: <BrainIcon size={15} /> },
   ];
 
   return createPortal(
     <div className="settings-overlay" onMouseDown={onClose}>
       <div className="settings-modal" onMouseDown={(e) => e.stopPropagation()}>
-
-        {/* Header */}
         <div className="settings-header">
           <div className="settings-title">{t.settingsTitle}</div>
-          <button className="settings-close" onClick={onClose}>✕</button>
+          <button className="settings-close" onClick={onClose} aria-label={t.cancel}>×</button>
         </div>
 
-        {/* Body: sidebar + content */}
         <div className="settings-layout">
           <nav className="settings-nav">
             {navItems.map((item) => (
@@ -126,7 +168,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           </nav>
 
           <div className="settings-content">
-            {/* 模型配置 */}
             {activeSection === 'model' && (
               <div className="settings-section">
                 <div className="settings-field">
@@ -135,11 +176,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     <button
                       className={`provider-tab ${form.provider === 'openai' ? 'active' : ''}`}
                       onClick={() => setProvider('openai')}
-                    >{t.openaiCompatible}</button>
+                    >
+                      {t.openaiCompatible}
+                    </button>
                     <button
                       className={`provider-tab ${form.provider === 'anthropic' ? 'active' : ''}`}
                       onClick={() => setProvider('anthropic')}
-                    >{t.anthropicProvider}</button>
+                    >
+                      {t.anthropicProvider}
+                    </button>
                   </div>
                 </div>
 
@@ -147,36 +192,62 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   <>
                     <div className="settings-field">
                       <label>{t.apiKey}</label>
-                      <input type="password" value={form.openai.apiKey}
-                        onChange={(e) => setOpenAIField('apiKey', e.target.value)} placeholder="sk-..." />
+                      <input
+                        type="password"
+                        value={form.openai.apiKey}
+                        onChange={(e) => setOpenAIField('apiKey', e.target.value)}
+                        placeholder="sk-..."
+                      />
                     </div>
                     <div className="settings-field">
                       <label>{t.baseUrl}</label>
-                      <input type="text" value={form.openai.baseUrl}
-                        onChange={(e) => setOpenAIField('baseUrl', e.target.value)} placeholder="https://api.openai.com/v1" />
+                      <input
+                        type="text"
+                        value={form.openai.baseUrl}
+                        onChange={(e) => setOpenAIField('baseUrl', e.target.value)}
+                        placeholder="https://api.openai.com/v1"
+                      />
                     </div>
                     <div className="settings-field">
                       <label>{t.modelField}</label>
-                      <input type="text" value={form.openai.model}
-                        onChange={(e) => setOpenAIField('model', e.target.value)} placeholder="gpt-4o" />
+                      <input
+                        type="text"
+                        value={form.openai.model}
+                        onChange={(e) => setOpenAIField('model', e.target.value)}
+                        placeholder="gpt-4o"
+                      />
                     </div>
                   </>
                 ) : (
                   <>
                     <div className="settings-field">
                       <label>{t.apiKey}</label>
-                      <input type="password" value={form.anthropic.apiKey}
-                        onChange={(e) => setAnthropicField('apiKey', e.target.value)} placeholder="sk-ant-..." />
+                      <input
+                        type="password"
+                        value={form.anthropic.apiKey}
+                        onChange={(e) => setAnthropicField('apiKey', e.target.value)}
+                        placeholder="sk-ant-..."
+                      />
                     </div>
                     <div className="settings-field">
-                      <label>{t.baseUrl} <span className="field-optional">{t.optional}</span></label>
-                      <input type="text" value={form.anthropic.baseUrl ?? ''}
-                        onChange={(e) => setAnthropicField('baseUrl', e.target.value)} placeholder="https://api.anthropic.com" />
+                      <label>
+                        {t.baseUrl} <span className="field-optional">{t.optional}</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={form.anthropic.baseUrl ?? ''}
+                        onChange={(e) => setAnthropicField('baseUrl', e.target.value)}
+                        placeholder="https://api.anthropic.com"
+                      />
                     </div>
                     <div className="settings-field">
                       <label>{t.modelField}</label>
-                      <input type="text" value={form.anthropic.model}
-                        onChange={(e) => setAnthropicField('model', e.target.value)} placeholder="claude-opus-4-6" />
+                      <input
+                        type="text"
+                        value={form.anthropic.model}
+                        onChange={(e) => setAnthropicField('model', e.target.value)}
+                        placeholder="claude-opus-4-6"
+                      />
                     </div>
                   </>
                 )}
@@ -187,7 +258,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     type="number"
                     min={0}
                     value={form.maxIterations ?? 0}
-                    onChange={(e) => setForm({ ...form, maxIterations: Math.max(0, parseInt(e.target.value) || 0) })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        maxIterations: Math.max(0, Number.parseInt(e.target.value, 10) || 0),
+                      })}
                   />
                   <div className="field-hint">{t.maxIterationsHint}</div>
                 </div>
@@ -196,7 +271,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               </div>
             )}
 
-            {/* 工作区 */}
             {activeSection === 'workspace' && (
               <div className="settings-section">
                 <div className="settings-field">
@@ -216,37 +290,132 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   )}
                   <div className="field-hint">{t.pythonStatusHint}</div>
                 </div>
+
                 <div className="settings-field">
                   <label>{t.workspaceDir}</label>
-                  <input type="text" value={form.workspace}
-                    onChange={(e) => setWorkspace(e.target.value)} placeholder="~/.asynagents/workspace" />
+                  <input
+                    type="text"
+                    value={form.workspace}
+                    onChange={(e) => setWorkspace(e.target.value)}
+                    placeholder="~/.asynagents/workspace"
+                  />
                   <div className="field-hint">{t.workspaceDirHint}</div>
                 </div>
               </div>
             )}
 
-            {/* 界面 */}
+            {activeSection === 'knowledge' && (
+              <div className="settings-section">
+                <div className="settings-resource-group">
+                  <div className="settings-section-title">{t.skillsManager}</div>
+                  <div className="field-hint settings-group-hint">{t.skillsManagerHint}</div>
+                  <div className="settings-resource-list">
+                    {sortSkills(skills).map((skill) => (
+                      <div className="settings-resource-item" key={skill.name}>
+                        <div className="settings-resource-copy">
+                          <div className="settings-resource-title">{skill.name}</div>
+                          <div className="settings-resource-meta">
+                            {skill.source === 'system' ? t.systemSource : t.userSource}
+                          </div>
+                          <div className="settings-resource-summary">
+                            {skill.description || t.noDescription}
+                          </div>
+                        </div>
+                        <button
+                          className={`toggle-switch ${skill.enabled ? 'on' : ''}`}
+                          onClick={() => void handleToggleSkill(skill)}
+                          disabled={togglingSkill === skill.name}
+                          title={skill.enabled ? t.disable : t.enable}
+                        >
+                          <span className="toggle-knob" />
+                        </button>
+                      </div>
+                    ))}
+                    {skills.length === 0 && (
+                      <div className="settings-empty-state">{t.noSkills}</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="settings-resource-group">
+                  <div className="settings-section-title">{t.experiencesManager}</div>
+                  <div className="field-hint settings-group-hint">{t.experiencesManagerHint}</div>
+                  <div className="settings-resource-list">
+                    {sortExperiences(experiences).map((experience) => (
+                      <div className="settings-resource-item" key={experience.fileName}>
+                        <div className="settings-resource-copy">
+                          <div className="settings-resource-title">{experience.title}</div>
+                          <div className="settings-resource-meta">{experience.fileName}</div>
+                          <div className="settings-resource-summary">
+                            {experience.summary || t.noDescription}
+                          </div>
+                          {experience.keywords.length > 0 && (
+                            <div className="settings-resource-tags">
+                              {experience.keywords.map((keyword) => (
+                                <span className="settings-tag" key={keyword}>{keyword}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          className={`toggle-switch ${experience.enabled ? 'on' : ''}`}
+                          onClick={() => void handleToggleExperience(experience)}
+                          disabled={togglingExperience === experience.fileName}
+                          title={experience.enabled ? t.disable : t.enable}
+                        >
+                          <span className="toggle-knob" />
+                        </button>
+                      </div>
+                    ))}
+                    {experiences.length === 0 && (
+                      <div className="settings-empty-state">{t.noExperiences}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {activeSection === 'ui' && (
               <div className="settings-section">
                 <div className="settings-field">
                   <label>{t.interfaceLanguage}</label>
                   <div className="provider-tabs">
-                    <button className={`provider-tab ${ui.language === 'zh' ? 'active' : ''}`}
-                      onClick={() => setUiField({ language: 'zh' })}>中文</button>
-                    <button className={`provider-tab ${ui.language === 'en' ? 'active' : ''}`}
-                      onClick={() => setUiField({ language: 'en' })}>English</button>
+                    <button
+                      className={`provider-tab ${ui.language === 'zh' ? 'active' : ''}`}
+                      onClick={() => setUiField({ language: 'zh' })}
+                    >
+                      中文
+                    </button>
+                    <button
+                      className={`provider-tab ${ui.language === 'en' ? 'active' : ''}`}
+                      onClick={() => setUiField({ language: 'en' })}
+                    >
+                      English
+                    </button>
                   </div>
                 </div>
 
                 <div className="settings-field">
                   <label>{t.userLanguageLabel}</label>
                   <div className="provider-tabs">
-                    <button className={`provider-tab ${ui.userLanguage === 'auto' ? 'active' : ''}`}
-                      onClick={() => setUiField({ userLanguage: 'auto' })}>Auto</button>
-                    <button className={`provider-tab ${ui.userLanguage === 'zh' ? 'active' : ''}`}
-                      onClick={() => setUiField({ userLanguage: 'zh' })}>中文</button>
-                    <button className={`provider-tab ${ui.userLanguage === 'en' ? 'active' : ''}`}
-                      onClick={() => setUiField({ userLanguage: 'en' })}>English</button>
+                    <button
+                      className={`provider-tab ${ui.userLanguage === 'auto' ? 'active' : ''}`}
+                      onClick={() => setUiField({ userLanguage: 'auto' })}
+                    >
+                      Auto
+                    </button>
+                    <button
+                      className={`provider-tab ${ui.userLanguage === 'zh' ? 'active' : ''}`}
+                      onClick={() => setUiField({ userLanguage: 'zh' })}
+                    >
+                      中文
+                    </button>
+                    <button
+                      className={`provider-tab ${ui.userLanguage === 'en' ? 'active' : ''}`}
+                      onClick={() => setUiField({ userLanguage: 'en' })}
+                    >
+                      English
+                    </button>
                   </div>
                   <div className="field-hint">{t.userLanguageHint}</div>
                 </div>
@@ -256,28 +425,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     <span>{t.showToolCallsByDefault}</span>
                     <span className="field-hint">{t.showToolCallsByDefaultHint}</span>
                   </div>
-                  <button className={`toggle-switch ${ui.showToolCalls ? 'on' : ''}`}
-                    onClick={() => setUiField({ showToolCalls: !ui.showToolCalls })}>
+                  <button
+                    className={`toggle-switch ${ui.showToolCalls ? 'on' : ''}`}
+                    onClick={() => setUiField({ showToolCalls: !ui.showToolCalls })}
+                  >
                     <span className="toggle-knob" />
                   </button>
                 </div>
               </div>
             )}
-            {/* 角色 */}
+
             {activeSection === 'persona' && (
               <div className="settings-section">
                 <div className="settings-field">
                   <label>{t.aiName}</label>
-                  <input type="text" value={persona.aiName}
+                  <input
+                    type="text"
+                    value={persona.aiName}
                     onChange={(e) => setPersonaField('aiName', e.target.value)}
-                    placeholder={t.aiNamePlaceholder} />
+                    placeholder={t.aiNamePlaceholder}
+                  />
                   <div className="field-hint">{t.aiNameHint}</div>
                 </div>
                 <div className="settings-field">
                   <label>{t.userName}</label>
-                  <input type="text" value={persona.userName}
+                  <input
+                    type="text"
+                    value={persona.userName}
                     onChange={(e) => setPersonaField('userName', e.target.value)}
-                    placeholder={t.userNamePlaceholder} />
+                    placeholder={t.userNamePlaceholder}
+                  />
                   <div className="field-hint">{t.userNameHint}</div>
                 </div>
                 <div className="settings-field">
@@ -296,7 +473,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           </div>
         </div>
 
-        {/* Footer */}
         <div className="settings-footer">
           <div className="settings-actions">
             <button className="settings-cancel" onClick={onClose}>{t.cancel}</button>
@@ -305,7 +481,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             </button>
           </div>
         </div>
-
       </div>
     </div>,
     document.body

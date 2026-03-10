@@ -127,6 +127,10 @@
   padding: 20px 24px;
 }
 
+.settings-resource-group + .settings-resource-group {
+  margin-top: 24px;
+}
+
 .settings-section-title {
   font-size: 11px;
   font-weight: 600;
@@ -228,6 +232,81 @@
   font-size: 11px;
   color: var(--text-3);
   margin-top: 4px;
+}
+
+.settings-group-hint {
+  margin-bottom: 10px;
+}
+
+.settings-resource-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-resource-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: @radius-sm;
+  background: var(--surface);
+}
+
+.settings-resource-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.settings-resource-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.settings-resource-meta {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-3);
+  word-break: break-all;
+}
+
+.settings-resource-summary {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-2);
+  word-break: break-word;
+}
+
+.settings-resource-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.settings-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.settings-empty-state {
+  padding: 14px;
+  border: 1px dashed var(--border2);
+  border-radius: @radius-sm;
+  font-size: 12px;
+  color: var(--text-3);
+  background: var(--surface);
 }
 
 .status-badge {
