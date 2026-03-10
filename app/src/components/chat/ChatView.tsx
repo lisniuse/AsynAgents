@@ -8,7 +8,7 @@ import './ChatView.less';
 
 export const ChatView: React.FC = () => {
   const t = useT();
-  const { activeConversationId, conversations, createConversation } = useAppStore();
+  const { activeConversationId, conversations } = useAppStore();
   const { sendMessage, stopCurrentAgent } = useSSE();
   const [inputValue, setInputValue] = useState('');
   const [isStopping, setIsStopping] = useState(false);
@@ -104,9 +104,6 @@ export const ChatView: React.FC = () => {
   const canSend = inputValue.trim().length > 0 || selectedImages.length > 0;
 
   const handlePromptClick = (text: string) => {
-    if (!activeConversationId) {
-      createConversation();
-    }
     setInputValue(text);
     textareaRef.current?.focus();
   };

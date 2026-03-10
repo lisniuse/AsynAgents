@@ -21,7 +21,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
   const {
     conversations,
     activeConversationId,
-    createConversation,
     deleteConversation,
     setActiveConversation,
     updateConversationName,
@@ -30,9 +29,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
     setSidebarCollapsed,
   } = useAppStore();
 
-  const handleNewChat = async () => {
-    const id = await createConversation();
-    navigate(`/c/${id}`);
+  const handleNewChat = () => {
+    setActiveConversation(null);
+    navigate(`/`);
     onMobileClose?.();
   };
 

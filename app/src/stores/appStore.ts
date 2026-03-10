@@ -243,7 +243,7 @@ export const useAppStore = create<AppState>()(
                 messages: [...c.messages, message],
                 updatedAt: Date.now(),
                 name: c.messages.length === 0 && message.role === 'user'
-                  ? message.content.slice(0, 30) + (message.content.length > 30 ? '...' : '')
+                  ? message.content
                   : c.name,
               }
             : c
