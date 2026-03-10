@@ -32,6 +32,7 @@ function syncRuntimeConfig(nextConfig: typeof config): void {
   config.provider = nextConfig.provider;
   config.maxIterations = nextConfig.maxIterations;
   config.python = nextConfig.python;
+  config.experience = nextConfig.experience;
   config.anthropic = nextConfig.anthropic;
   config.openai = nextConfig.openai;
   config.server = nextConfig.server;

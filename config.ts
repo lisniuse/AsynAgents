@@ -9,6 +9,11 @@ export interface Config {
   python: {
     path: string;
   };
+  experience: {
+    idleMinutes: number;
+    scanIntervalMs: number;
+    maxEntriesInPrompt: number;
+  };
   anthropic: {
     apiKey: string;
     baseUrl?: string;
@@ -52,6 +57,11 @@ const defaultConfig: Config = {
   provider: 'openai',
   python: {
     path: 'python',
+  },
+  experience: {
+    idleMinutes: 20,
+    scanIntervalMs: 60000,
+    maxEntriesInPrompt: 50,
   },
   anthropic: {
     apiKey: '',
@@ -105,6 +115,7 @@ function loadConfig(): Config {
       ...defaultConfig,
       ...userConfig,
       python: { ...defaultConfig.python, ...userConfig.python },
+      experience: { ...defaultConfig.experience, ...userConfig.experience },
       anthropic: { ...defaultConfig.anthropic, ...userConfig.anthropic },
       openai: { ...defaultConfig.openai, ...userConfig.openai },
       server: { ...defaultConfig.server, ...userConfig.server },

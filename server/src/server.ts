@@ -1,22 +1,23 @@
-import express from 'express';
 import cors from 'cors';
-import { fileURLToPath } from 'url';
+import express from 'express';
 import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+import { CONFIG_PATH, activeModel, config, validateConfig, workspaceDir } from '../../config.js';
+import { isPythonToolAvailable, probePythonTool } from './agent/tools.js';
+import { ExperienceScheduler } from './experience/ExperienceScheduler.js';
+import { listExperiences } from './experience/ExperienceStorage.js';
 import chatRouter from './routes/chat.js';
-import eventsRouter from './routes/events.js';
-import conversationsRouter from './routes/conversations.js';
 import configRouter from './routes/config.js';
-import { config, activeModel, validateConfig, workspaceDir, CONFIG_PATH } from '../../config.js';
-import { logger, log } from './utils/logger.js';
+import conversationsRouter from './routes/conversations.js';
+import eventsRouter from './routes/events.js';
 import { loadSkills } from './skills/SkillLoader.js';
-import { probePythonTool, isPythonToolAvailable } from './agent/tools.js';
+import { log } from './utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
 
-// 请求日志中间件
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
@@ -39,14 +40,14 @@ app.use('/api', eventsRouter);
 app.use('/api', conversationsRouter);
 app.use('/api', configRouter);
 
-// SPA fallback — serve index.html for all non-API routes
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/health')) return next();
   res.sendFile(join(__dirname, '../public', 'index.html'));
 });
 
-app.get('/health', (_req, res) => {
+app.get('/health', async (_req, res) => {
   const validation = validateConfig();
+  const experiences = await listExperiences().catch(() => []);
   res.json({
     status: validation.valid ? 'ok' : 'misconfigured',
     provider: config.provider,
@@ -56,20 +57,24 @@ app.get('/health', (_req, res) => {
     pythonAvailable: isPythonToolAvailable(),
     configFile: CONFIG_PATH,
     workspace: workspaceDir,
+    experienceCount: experiences.length,
     ...(validation.errors.length > 0 && { configErrors: validation.errors }),
   });
 });
 
 const pythonProbe = await probePythonTool();
+const experienceScheduler = new ExperienceScheduler();
+experienceScheduler.start();
 
-app.listen(config.server.port, () => {
+app.listen(config.server.port, async () => {
   const model = activeModel();
   const providerLabel = config.provider === 'openai'
-    ? `OpenAI-compatible  [${config.openai.baseUrl}]`
-    : `Anthropic`;
+    ? `OpenAI-compatible [${config.openai.baseUrl}]`
+    : 'Anthropic';
 
   const validation = validateConfig();
   const skills = loadSkills();
+  const experiences = await listExperiences().catch(() => []);
 
   log.info('Asyn Agents Server started', {
     url: `http://localhost:${config.server.port}`,
@@ -81,39 +86,42 @@ app.listen(config.server.port, () => {
     pythonAvailable: isPythonToolAvailable(),
     logLevel: config.logging.level,
     configured: validation.valid,
-    skills: skills.map((s) => s.name),
+    skills: skills.map((skill) => skill.name),
+    experiences: experiences.length,
   });
 
-  console.log(`\n🚀 Asyn Agents Server`);
-  console.log(`   URL:       http://localhost:${config.server.port}`);
-  console.log(`   Provider:  ${providerLabel}`);
-  console.log(`   Model:     ${model}`);
-  console.log(`   Config:    ${CONFIG_PATH}`);
-  console.log(`   Workspace: ${workspaceDir}`);
-  console.log(`   Python:    ${config.python.path}`);
-  console.log(`   Python OK: ${isPythonToolAvailable() ? 'yes' : 'no'}`);
+  console.log('\nAsyn Agents Server');
+  console.log(`   URL:        http://localhost:${config.server.port}`);
+  console.log(`   Provider:   ${providerLabel}`);
+  console.log(`   Model:      ${model}`);
+  console.log(`   Config:     ${CONFIG_PATH}`);
+  console.log(`   Workspace:  ${workspaceDir}`);
+  console.log(`   Python:     ${config.python.path}`);
+  console.log(`   Python OK:  ${isPythonToolAvailable() ? 'yes' : 'no'}`);
+  console.log(`   Experiences:${String(experiences.length).padStart(4, ' ')}`);
   if (!pythonProbe.available && pythonProbe.error) {
-    console.log(`              ${pythonProbe.error.split('\n')[0]}`);
+    console.log(`               ${pythonProbe.error.split('\n')[0]}`);
   }
   if (validation.valid) {
-    console.log(`   API Key:   ✓ configured`);
+    console.log('   API Key:    configured');
   } else {
-    console.log(`   API Key:   ✗ missing`);
-    validation.errors.forEach(e => console.log(`              ⚠ ${e}`));
+    console.log('   API Key:    missing');
+    validation.errors.forEach((error) => console.log(`               ${error}`));
   }
   if (skills.length > 0) {
-    console.log(`   Skills:    ${skills.map((s) => s.name).join(', ')}`);
+    console.log(`   Skills:     ${skills.map((skill) => skill.name).join(', ')}`);
   }
   console.log();
 });
 
-// 优雅关闭
 process.on('SIGTERM', () => {
+  experienceScheduler.stop();
   log.info('SIGTERM received, shutting down gracefully');
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
+  experienceScheduler.stop();
   log.info('SIGINT received, shutting down gracefully');
   process.exit(0);
 });

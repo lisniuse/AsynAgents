@@ -7,6 +7,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type OpenAI from 'openai';
 import { config, workspaceDir } from '../../../config.js';
 import { getSkillContent } from '../skills/SkillLoader.js';
+import { getExperienceContent } from '../experience/ExperienceStorage.js';
 
 const execAsync = promisify(exec);
 const MAX_OUTPUT = 12000;
@@ -135,6 +136,18 @@ const allAnthropicTools: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'get_experience',
+    description:
+      'Get the full content of an experience note by filename or keyword slug. Use this when the system prompt lists a relevant experience.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Experience file name or slug (for example "retry_provider_timeout")' },
+      },
+      required: ['name'],
+    },
+  },
+  {
     name: 'get_skill',
     description:
       'Get detailed usage instructions for a skill. Call this before using any skill to learn the exact commands and options.',
@@ -248,6 +261,15 @@ export async function executeTool(
       const content = getSkillContent(skillName);
       if (content === null) {
         return `Skill "${skillName}" not found. Use the available skills list in the system prompt.`;
+      }
+      return content;
+    }
+
+    case 'get_experience': {
+      const experienceName = input['name'] as string;
+      const content = await getExperienceContent(experienceName);
+      if (content === null) {
+        return `Experience "${experienceName}" not found. Use the available experiences list in the system prompt.`;
       }
       return content;
     }

@@ -5,9 +5,30 @@ import { validateConfig } from '../../../config.js';
 import type { ChatRequest, ChatResponse } from '../types/index.js';
 
 const router = Router();
-
-// 存储正在运行的 Agent
 const runningAgents = new Map<string, SubAgent>();
+const runningConversationThreads = new Map<string, Set<string>>();
+
+function trackConversationThread(conversationId: string, threadId: string): void {
+  const threads = runningConversationThreads.get(conversationId) ?? new Set<string>();
+  threads.add(threadId);
+  runningConversationThreads.set(conversationId, threads);
+}
+
+function untrackConversationThread(conversationId: string, threadId: string): void {
+  const threads = runningConversationThreads.get(conversationId);
+  if (!threads) {
+    return;
+  }
+
+  threads.delete(threadId);
+  if (threads.size === 0) {
+    runningConversationThreads.delete(conversationId);
+  }
+}
+
+export function isConversationRunning(conversationId: string): boolean {
+  return (runningConversationThreads.get(conversationId)?.size ?? 0) > 0;
+}
 
 router.post('/chat', async (req, res) => {
   const validation = validateConfig();
@@ -27,24 +48,26 @@ router.post('/chat', async (req, res) => {
   const response: ChatResponse = { threadId };
   res.json(response);
 
-  // Run agent asynchronously — do not await
   const agent = new SubAgent();
   runningAgents.set(threadId, agent);
+  trackConversationThread(conversationId, threadId);
 
   agent
     .run(threadId, conversationId, conversationHistory || [], message, images)
     .then(() => {
       runningAgents.delete(threadId);
+      untrackConversationThread(conversationId, threadId);
     })
     .catch((err: Error) => {
       console.error(`[Thread ${threadId}] Agent error:`, err.message);
       runningAgents.delete(threadId);
+      untrackConversationThread(conversationId, threadId);
     });
 });
 
 router.post('/chat/stop', (req, res) => {
   const { threadId } = req.body as { threadId: string };
-  
+
   if (!threadId) {
     res.status(400).json({ error: 'threadId is required' });
     return;

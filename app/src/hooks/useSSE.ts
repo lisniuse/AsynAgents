@@ -4,6 +4,7 @@ import { useAppStore } from '@/stores/appStore';
 import type { SSEEvent, ToolCallData, ToolResultData } from '@/types';
 
 const API_BASE = '/api';
+const SUMMARY_COMMANDS = new Set(['/summarize']);
 
 // ─── Per-conversation session state in localStorage ───────────────────────────
 // Tracks lastIndex (next event to request on reconnect) and whether an agent
@@ -173,7 +174,16 @@ export const useSSE = () => {
             .find(c => c.id === conversationId)
             ?.messages.find(m => m.role === 'assistant' && m.threadId === event.threadId);
           if (msg) {
-            updateMessage(conversationId, msg.id, { isStreaming: false });
+            const doneData = event.data as { text?: string; thinking?: string };
+            updateMessage(conversationId, msg.id, {
+              isStreaming: false,
+              ...(doneData.text && doneData.text.length > (msg.content?.length ?? 0)
+                ? { content: doneData.text }
+                : {}),
+              ...(doneData.thinking && doneData.thinking.length > (msg.thinking?.length ?? 0)
+                ? { thinking: doneData.thinking }
+                : {}),
+            });
           }
 
           // Save conversation to backend
@@ -282,11 +292,62 @@ export const useSSE = () => {
   const sendMessage = useCallback(
     async (message: string, images?: string[]) => {
       let conversationId = activeConversationId;
+      const trimmedMessage = message.trim();
+
+      if (SUMMARY_COMMANDS.has(trimmedMessage)) {
+        if (!conversationId) {
+          return;
+        }
+
+        const conversation = useAppStore.getState().conversations.find((c) => c.id === conversationId);
+        if (!conversation || conversation.messages.filter((msg) => msg.kind !== 'summary_note').length === 0) {
+          return;
+        }
+
+        try {
+          const response = await fetch(`${API_BASE}/conversations/${conversationId}/summarize`, {
+            method: 'POST',
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || 'Failed to summarize conversation');
+          }
+
+          useAppStore.getState().addMessage(conversationId, {
+            id: 'msg_' + Math.random().toString(36).substring(2, 15),
+            role: 'assistant',
+            content: data.message,
+            timestamp: Date.now(),
+            kind: 'summary_note',
+          });
+
+          const updatedConversation = useAppStore.getState().conversations.find((c) => c.id === conversationId);
+          if (updatedConversation) {
+            const messagesToSave = updatedConversation.messages.map(({ isStreaming: _, ...msg }) => msg);
+            fetch(`${API_BASE}/conversations/${conversationId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ messages: messagesToSave, name: updatedConversation.name }),
+            }).catch(console.error);
+          }
+        } catch (err) {
+          console.error('Summarize conversation error:', err);
+        }
+        return;
+      }
 
       if (!conversationId) {
         conversationId = await useAppStore.getState().createConversation();
         navigate(`/c/${conversationId}`);
       }
+
+      const existingConversation = useAppStore.getState().conversations.find(c => c.id === conversationId);
+      const conversationHistory = existingConversation?.messages
+        .filter((msg) => msg.kind !== 'summary_note')
+        .map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        })) ?? [];
 
       const userMsgId = 'msg_' + Math.random().toString(36).substring(2, 15);
       useAppStore.getState().addMessage(conversationId, {
@@ -315,10 +376,7 @@ export const useSSE = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             conversationId,
-            conversationHistory: conversation?.messages.map((m) => ({
-              role: m.role,
-              content: m.content,
-            })) ?? [],
+            conversationHistory,
             message,
             images,
           }),

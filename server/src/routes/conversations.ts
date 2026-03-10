@@ -1,7 +1,14 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { validateConfig } from '../../../config.js';
 import * as storage from '../storage/ConversationStorage.js';
 import * as meta from '../storage/ConversationMeta.js';
+import { deleteConversationExperienceState } from '../experience/ExperienceStateStorage.js';
+import {
+  getSummaryResultText,
+  summarizeConversation,
+} from '../experience/ExperienceSummarizer.js';
+import { isConversationRunning } from './chat.js';
 import type { StoredConversation } from '../types/index.js';
 
 const router = Router();
@@ -59,6 +66,7 @@ router.delete('/conversations/:id', async (req, res) => {
     const success = await storage.deleteConversation(req.params.id);
     if (!success) return res.status(404).json({ error: 'Not found' });
     await meta.deleteMeta(req.params.id).catch(() => {});
+    await deleteConversationExperienceState(req.params.id).catch(() => {});
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
@@ -70,6 +78,36 @@ router.put('/conversations/:id/meta', async (req, res) => {
     const { pinned, bold } = req.body;
     const updated = await meta.updateMeta(req.params.id, { pinned, bold });
     res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.post('/conversations/:id/summarize', async (req, res) => {
+  try {
+    const validation = validateConfig();
+    if (!validation.valid) {
+      res.status(503).json({ error: validation.errors.join('\n') });
+      return;
+    }
+
+    const conversationId = req.params.id;
+    if (isConversationRunning(conversationId)) {
+      res.status(409).json({ error: 'Conversation is still running.' });
+      return;
+    }
+
+    const conversation = await storage.getConversation(conversationId);
+    if (!conversation) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+
+    const result = await summarizeConversation(conversation, { trigger: 'manual', force: true });
+    res.json({
+      ...result,
+      message: getSummaryResultText(result),
+    });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }

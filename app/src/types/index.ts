@@ -51,6 +51,7 @@ export interface Message {
   toolCalls?: ToolCallState[];
   isStreaming?: boolean;
   threadId?: string;
+  kind?: 'chat' | 'summary_note';
 }
 
 export interface ToolCallState {

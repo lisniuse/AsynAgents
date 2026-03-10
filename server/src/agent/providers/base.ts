@@ -41,6 +41,8 @@ function buildToolSection(): string {
     '- write_file: Create or overwrite a file',
     '- read_file: Read file contents',
     '- list_directory: List directory contents',
+    '- get_experience: Read a saved experience note in full',
+    '- get_skill: Read a skill instruction file in full',
   ];
 
   if (isPythonToolAvailable()) {

@@ -4,6 +4,11 @@
   "python": {
     "path": "python"
   },
+  "experience": {
+    "idleMinutes": 20,
+    "scanIntervalMs": 60000,
+    "maxEntriesInPrompt": 50
+  },
   "anthropic": {
     "apiKey": "",
     "model": "claude-opus-4-6"

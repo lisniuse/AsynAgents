@@ -7,6 +7,7 @@ import { createChildLogger } from '../utils/logger.js';
 import type { LLMProvider } from './providers/base.js';
 import { buildSystemPrompt } from './providers/base.js';
 import { loadSkills, buildSkillsPrompt } from '../skills/SkillLoader.js';
+import { buildExperiencePrompt, loadExperiences } from '../experience/ExperienceLoader.js';
 import type { SSEEvent } from '../types/index.js';
 
 type SimpleMsg = { role: 'user' | 'assistant'; content: string };
@@ -24,28 +25,29 @@ const MAX_ITERATIONS = config.maxIterations > 0 ? config.maxIterations : 100;
 
 // Load skills once at module level (sync reads at startup)
 const skills = loadSkills();
-function createProvider(history: SimpleMsg[], userMessage: string, images?: string[]): LLMProvider {
+async function createProvider(history: SimpleMsg[], userMessage: string, images?: string[]): Promise<LLMProvider> {
+  const experiences = await loadExperiences();
   const systemPrompt = buildSystemPrompt(
-    buildSkillsPrompt(skills),
+    `${buildSkillsPrompt(skills)}${buildExperiencePrompt(experiences)}`,
     config.ui?.userLanguage ?? 'auto',
     config.persona
   );
 
   if (config.provider === 'openai') {
-    return new OpenAIProvider(
-      config.openai.apiKey,
-      config.openai.model,
-      config.openai.baseUrl,
+      return new OpenAIProvider(
+        config.openai.apiKey,
+        config.openai.model,
+        config.openai.baseUrl,
       history,
       userMessage,
       systemPrompt,
       images
     );
   }
-  return new AnthropicProvider(
-    config.anthropic.apiKey,
-    config.anthropic.model,
-    config.anthropic.baseUrl,
+    return new AnthropicProvider(
+      config.anthropic.apiKey,
+      config.anthropic.model,
+      config.anthropic.baseUrl,
     history,
     userMessage,
     systemPrompt,
@@ -86,7 +88,7 @@ export class SubAgent {
 
     publish('agent_start', { threadId });
 
-    const provider = createProvider(conversationHistory, userMessage, images);
+    const provider = await createProvider(conversationHistory, userMessage, images);
     let finalText = '';
     let thinkingText = '';
 

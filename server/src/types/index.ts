@@ -57,6 +57,7 @@ export interface StoredMessage {
   toolCalls?: StoredToolCall[];
   timestamp: number;
   threadId?: string;
+  kind?: 'chat' | 'summary_note';
 }
 
 export interface StoredConversation {
