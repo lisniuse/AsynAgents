@@ -22,6 +22,8 @@ interface AppState {
   loadSettings: () => Promise<void>;
   saveSettings: (patch: Partial<AppSettings>) => Promise<void>;
 
+  conversationsLoaded: boolean;
+
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (v: boolean) => void;
 
@@ -103,17 +105,19 @@ export const useAppStore = create<AppState>()(
     },
 
     conversations: [],
+    conversationsLoaded: false,
     activeConversationId: null,
     runningAgents: new Map(),
 
     loadConversations: async () => {
       try {
         const res = await fetch(`${API_BASE}/conversations`);
-        if (!res.ok) return;
+        if (!res.ok) { set({ conversationsLoaded: true }); return; }
         const conversations: Conversation[] = await res.json();
-        set({ conversations });
+        set({ conversations, conversationsLoaded: true });
       } catch (err) {
         console.error('Failed to load conversations:', err);
+        set({ conversationsLoaded: true });
       }
     },
 

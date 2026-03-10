@@ -50,6 +50,7 @@ export const useSSE = () => {
 
   const {
     activeConversationId,
+    conversationsLoaded,
     addMessage,
     updateMessage,
     appendToMessage,
@@ -255,19 +256,22 @@ export const useSSE = () => {
     };
   }, [handleEvent]);
 
-  // Reconnect whenever the active conversation changes
+  // Stable ref so the effect below doesn't re-run when connect identity changes
+  const connectRef = useRef(connect);
+  connectRef.current = connect;
+
+  // Connect only after conversations are loaded from server.
+  // This ensures replayed events can find their target conversation in the store.
   useEffect(() => {
-    if (!activeConversationId) {
-      eventSourceRef.current?.close();
-      eventSourceRef.current = null;
+    if (!activeConversationId || !conversationsLoaded) {
       return;
     }
-    connect(activeConversationId);
+    connectRef.current(activeConversationId);
     return () => {
       eventSourceRef.current?.close();
       eventSourceRef.current = null;
     };
-  }, [activeConversationId, connect]);
+  }, [activeConversationId, conversationsLoaded]);
 
   // ── Send message ───────────────────────────────────────────────────────────
   const sendMessage = useCallback(
