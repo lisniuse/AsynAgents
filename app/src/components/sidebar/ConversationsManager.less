@@ -8,6 +8,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  animation: overlay-fade-in 0.18s ease both;
+
+  &.is-closing {
+    animation: overlay-fade-out 0.16s ease both;
+  }
 }
 
 .mgr-modal {
@@ -20,6 +25,11 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  animation: modal-pop-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+  &.is-closing {
+    animation: modal-pop-out 0.18s ease both;
+  }
 }
 
 // Header

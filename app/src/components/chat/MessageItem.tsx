@@ -13,6 +13,9 @@ interface MessageItemProps {
   message: Message;
   onStop?: () => void;
   isStopping?: boolean;
+  onRollbackToMessage?: (message: Message) => void;
+  isRollingBack?: boolean;
+  rollbackDisabled?: boolean;
 }
 
 interface Point {
@@ -46,6 +49,7 @@ const MIN_ZOOM = 0.05;
 const DEFAULT_MAX_ZOOM = 16;
 const WHEEL_ZOOM_IN = 1.15;
 const WHEEL_ZOOM_OUT = 0.87;
+const CLOSE_ANIMATION_MS = 180;
 
 marked.setOptions({
   breaks: true,
@@ -279,6 +283,7 @@ function InteractiveImageLightbox({
 }): React.ReactNode {
   const t = useT();
   const [loadFailed, setLoadFailed] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -289,20 +294,33 @@ function InteractiveImageLightbox({
   const gestureRef = useRef<GestureState>(null);
   const zoomRef = useRef(1);
   const offsetRef = useRef<Point>({ x: 0, y: 0 });
+  const closeTimerRef = useRef<number | null>(null);
+
+  const requestClose = () => {
+    if (closing) {
+      return;
+    }
+
+    setClosing(true);
+    closeTimerRef.current = window.setTimeout(() => {
+      onClose();
+    }, CLOSE_ANIMATION_MS);
+  };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onClose();
+        requestClose();
       }
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  }, [requestClose]);
 
   useEffect(() => {
     setLoadFailed(false);
+    setClosing(false);
     setZoom(1);
     setOffset({ x: 0, y: 0 });
     setIsDragging(false);
@@ -313,6 +331,14 @@ function InteractiveImageLightbox({
     zoomRef.current = 1;
     offsetRef.current = { x: 0, y: 0 };
   }, [src]);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     zoomRef.current = zoom;
@@ -481,18 +507,21 @@ function InteractiveImageLightbox({
   };
 
   return createPortal(
-    <div className="image-lightbox" onClick={onClose}>
+    <div className={`image-lightbox ${closing ? 'is-closing' : ''}`} onClick={requestClose}>
       <button
         type="button"
-        className="image-lightbox-close"
+        className={`image-lightbox-close ${closing ? 'is-closing' : ''}`}
         onClick={(event) => {
           event.stopPropagation();
-          onClose();
+          requestClose();
         }}
       >
         ×
       </button>
-      <div className="image-lightbox-toolbar" onClick={(event) => event.stopPropagation()}>
+      <div
+        className={`image-lightbox-toolbar ${closing ? 'is-closing' : ''}`}
+        onClick={(event) => event.stopPropagation()}
+      >
         <button
           type="button"
           className="image-lightbox-action"
@@ -532,12 +561,15 @@ function InteractiveImageLightbox({
         onPointerCancel={onPointerUp}
       >
         {loadFailed ? (
-          <LocalizedImageFallbackCard className="image-lightbox-fallback" message={t.imageLoadFailed} />
+          <LocalizedImageFallbackCard
+            className={`image-lightbox-fallback ${closing ? 'is-closing' : ''}`}
+            message={t.imageLoadFailed}
+          />
         ) : (
           <img
             src={src}
             alt=""
-            className="image-lightbox-image"
+            className={`image-lightbox-image ${closing ? 'is-closing' : ''}`}
             draggable={false}
             onError={() => setLoadFailed(true)}
             onLoad={(event) => {
@@ -564,23 +596,59 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   message,
   onStop,
   isStopping = false,
+  onRollbackToMessage,
+  isRollingBack = false,
+  rollbackDisabled = false,
 }) => {
   const t = useT();
   const contentRef = useRef<HTMLDivElement>(null);
   const settings = useAppStore((state) => state.settings);
   const defaultExpanded = settings?.ui?.showToolCalls ?? true;
+  const autoCollapseOnDone = settings?.ui?.autoCollapseToolCalls ?? false;
   const assistantName = settings?.persona?.aiName?.trim() || t.assistant;
   const userName = settings?.persona?.userName?.trim() || t.user;
   const assistantAvatar = settings?.persona?.aiAvatar?.trim();
   const userAvatar = settings?.persona?.userAvatar?.trim();
   const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
   const [activeImage, setActiveImage] = useState<string | null>(null);
+  const autoCollapsedRef = useRef(false);
   const isToolCallsExpanded = manualExpanded !== null ? manualExpanded : defaultExpanded;
   const standaloneAssistantImages = getStandaloneAssistantImages(message.content, message.images);
 
   const handleToggle = () => {
     setManualExpanded(!isToolCallsExpanded);
   };
+
+  useEffect(() => {
+    autoCollapsedRef.current = false;
+    setManualExpanded(null);
+  }, [message.id]);
+
+  useEffect(() => {
+    const hasRunningTool = message.toolCalls?.some((toolCall) => toolCall.status === 'running') ?? false;
+    if (hasRunningTool || message.isStreaming) {
+      autoCollapsedRef.current = false;
+      return;
+    }
+
+    if (
+      autoCollapseOnDone &&
+      defaultExpanded &&
+      !autoCollapsedRef.current &&
+      message.toolCalls &&
+      message.toolCalls.length > 0 &&
+      manualExpanded === null
+    ) {
+      autoCollapsedRef.current = true;
+      setManualExpanded(false);
+    }
+  }, [
+    autoCollapseOnDone,
+    defaultExpanded,
+    manualExpanded,
+    message.isStreaming,
+    message.toolCalls,
+  ]);
 
   useEffect(() => {
     if (!contentRef.current) {
@@ -628,6 +696,16 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     return (
       <div className="message-wrapper msg-user">
         <div className="msg-user-header">
+          {message.checkpointId && onRollbackToMessage && (
+            <button
+              type="button"
+              className="msg-user-checkpoint-btn"
+              onClick={() => onRollbackToMessage(message)}
+              disabled={isRollingBack || rollbackDisabled}
+            >
+              {isRollingBack ? t.projectRollbacking : t.projectRollback}
+            </button>
+          )}
           <div className="msg-user-label">{userName}</div>
           <MessageAvatar
             role="user"

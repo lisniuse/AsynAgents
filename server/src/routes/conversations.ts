@@ -6,6 +6,7 @@ import * as meta from '../storage/ConversationMeta.js';
 import { deleteConversationExperienceState } from '../experience/ExperienceStateStorage.js';
 import {
   getSummaryResultText,
+  supportsExperienceSummaries,
   summarizeConversation,
 } from '../experience/ExperienceSummarizer.js';
 import { isConversationRunning } from './chat.js';
@@ -15,10 +16,16 @@ import {
   listProjectCheckpoints,
   initializeProjectSession,
   listProjectCandidates,
+  listChangedProjectFiles,
   listProjectTree,
   readProjectFile,
   restoreProjectCheckpoint,
 } from '../storage/ProjectSessionStorage.js';
+import {
+  deleteConversationProcess,
+  listConversationProcesses,
+  stopConversationProcess,
+} from '../process/ManagedProcessStorage.js';
 
 const router = Router();
 
@@ -103,12 +110,6 @@ router.put('/conversations/:id/meta', async (req, res) => {
 
 router.post('/conversations/:id/summarize', async (req, res) => {
   try {
-    const validation = validateConfig();
-    if (!validation.valid) {
-      res.status(503).json({ error: validation.errors.join('\n') });
-      return;
-    }
-
     const conversationId = req.params.id;
     if (isConversationRunning(conversationId)) {
       res.status(409).json({ error: 'Conversation is still running.' });
@@ -118,6 +119,17 @@ router.post('/conversations/:id/summarize', async (req, res) => {
     const conversation = await storage.getConversation(conversationId);
     if (!conversation) {
       res.status(404).json({ error: 'Not found' });
+      return;
+    }
+
+    if (!supportsExperienceSummaries(conversation)) {
+      res.status(409).json({ error: 'Experience summaries are not available for project mode conversations.' });
+      return;
+    }
+
+    const validation = validateConfig();
+    if (!validation.valid) {
+      res.status(503).json({ error: validation.errors.join('\n') });
       return;
     }
 
@@ -184,10 +196,74 @@ router.get('/conversations/:id/project/file', async (req, res) => {
   }
 });
 
+router.get('/conversations/:id/project/changes', async (req, res) => {
+  try {
+    const changes = await listChangedProjectFiles(req.params.id);
+    res.json(changes);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 router.get('/conversations/:id/project/checkpoints', async (req, res) => {
   try {
     const checkpoints = await listProjectCheckpoints(req.params.id);
     res.json(checkpoints);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.post('/conversations/:id/project/rollback-to-message', async (req, res) => {
+  try {
+    if (isConversationRunning(req.params.id)) {
+      res.status(409).json({ error: 'Conversation is still running.' });
+      return;
+    }
+
+    const conversation = await storage.getConversation(req.params.id);
+    if (!conversation) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+
+    const messageId = String(req.body.messageId ?? '').trim();
+    if (!messageId) {
+      res.status(400).json({ error: 'messageId is required' });
+      return;
+    }
+
+    const targetIndex = conversation.messages.findIndex((message) => message.id === messageId);
+    if (targetIndex === -1) {
+      res.status(404).json({ error: 'Message not found' });
+      return;
+    }
+
+    const targetMessage = conversation.messages[targetIndex];
+    if (targetMessage.role !== 'user') {
+      res.status(400).json({ error: 'Only user messages can be used as checkpoints' });
+      return;
+    }
+
+    if (!targetMessage.checkpointId) {
+      res.status(400).json({ error: 'This message does not have a checkpoint' });
+      return;
+    }
+
+    await restoreProjectCheckpoint(req.params.id, targetMessage.checkpointId);
+
+    const updated: StoredConversation = {
+      ...conversation,
+      messages: conversation.messages.slice(0, targetIndex),
+      updatedAt: Date.now(),
+    };
+    await storage.saveConversation(updated);
+
+    res.json({
+      ok: true,
+      inputMessage: targetMessage.content,
+      conversation: updated,
+    });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -211,6 +287,41 @@ router.post('/conversations/:id/project/apply', async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.get('/conversations/:id/processes', async (req, res) => {
+  try {
+    const processes = await listConversationProcesses(req.params.id);
+    res.json(processes);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.post('/conversations/:id/processes/:processId/stop', async (req, res) => {
+  try {
+    const processInfo = await stopConversationProcess(req.params.id, req.params.processId);
+    res.json(processInfo);
+  } catch (err) {
+    const message = (err as Error).message;
+    const status = message === 'Process not found.' ? 404 : 500;
+    res.status(status).json({ error: message });
+  }
+});
+
+router.delete('/conversations/:id/processes/:processId', async (req, res) => {
+  try {
+    await deleteConversationProcess(req.params.id, req.params.processId);
+    res.json({ ok: true });
+  } catch (err) {
+    const message = (err as Error).message;
+    const status = message === 'Process not found.'
+      ? 404
+      : message === 'Stop the process before deleting it.'
+        ? 409
+        : 500;
+    res.status(status).json({ error: message });
   }
 });
 

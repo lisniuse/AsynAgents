@@ -7,6 +7,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type OpenAI from 'openai';
 import { config, workspaceDir } from '../../../config.js';
 import { getExperienceContent } from '../experience/ExperienceStorage.js';
+import { startManagedProcess } from '../process/ManagedProcessStorage.js';
 import { getSkillContent } from '../skills/SkillLoader.js';
 import { isCatalogItemEnabled } from '../storage/FeatureToggleStorage.js';
 import { resolveWritableImagesDir } from '../utils/runtimePaths.js';
@@ -27,6 +28,7 @@ export interface ToolExecutionResult {
 
 export interface ToolExecutionContext {
   rootDir?: string;
+  conversationId?: string;
 }
 
 if (!existsSync(workspaceDir)) {
@@ -207,12 +209,14 @@ const allAnthropicTools: Anthropic.Tool[] = [
   {
     name: 'bash',
     description:
-      'Execute a shell command. Use for running programs, installing packages, checking system info, compiling code, running tests, etc.',
+      'Execute a shell command. Use for running programs, installing packages, checking system info, compiling code, running tests, and starting long-running dev servers. For long-running commands, set background=true so the process can be managed later.',
     input_schema: {
       type: 'object',
       properties: {
         command: { type: 'string', description: 'The shell command to execute' },
         timeout: { type: 'number', description: 'Timeout in ms (default: 30000)' },
+        background: { type: 'boolean', description: 'Whether to keep the command running in the background for later management' },
+        name: { type: 'string', description: 'Optional short label for the managed background process' },
       },
       required: ['command'],
     },
@@ -388,7 +392,37 @@ export async function executeTool(
 ): Promise<ToolExecutionResult> {
   const rootDir = context.rootDir || workspaceDir;
   switch (name) {
-    case 'bash':
+    case 'bash': {
+      if (input['background']) {
+        if (!context.conversationId) {
+          return {
+            output: 'Error: Background bash commands require an active conversation context.',
+          };
+        }
+
+        try {
+          const managed = await startManagedProcess({
+            conversationId: context.conversationId,
+            command: input['command'] as string,
+            cwd: rootDir,
+            name: input['name'] as string | undefined,
+          });
+          const urls = managed.urls.length > 0 ? `\nURLs: ${managed.urls.join(', ')}` : '';
+          const ports = managed.ports.length > 0 ? `\nPorts: ${managed.ports.join(', ')}` : '';
+          return {
+            output:
+              `Started background process "${managed.name}" (ID: ${managed.id}, PID: ${managed.pid}).` +
+              `\nUse the process manager to inspect logs, open detected URLs, stop it, or delete the record.` +
+              urls +
+              ports,
+          };
+        } catch (err: unknown) {
+          return {
+            output: `Error starting background process: ${(err as Error).message}`,
+          };
+        }
+      }
+
       return {
         output: await executeBash(
           input['command'] as string,
@@ -396,6 +430,7 @@ export async function executeTool(
           rootDir
         ),
       };
+    }
 
     case 'python':
       return {

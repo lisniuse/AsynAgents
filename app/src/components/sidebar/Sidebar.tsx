@@ -9,6 +9,8 @@ import { ConversationsManager } from './ConversationsManager';
 import { useT } from '@/i18n';
 import './Sidebar.less';
 
+const CLOSE_ANIMATION_MS = 180;
+
 interface SidebarProps {
   mobileOpen?: boolean;
   onMobileClose?: () => void;
@@ -51,10 +53,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
   // 重命名弹窗
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [renameClosing, setRenameClosing] = useState(false);
   const renameInputRef = React.useRef<HTMLInputElement>(null);
 
   // 删除确认
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteConfirmClosing, setDeleteConfirmClosing] = useState(false);
 
   useEffect(() => {
     if (!menuId) return;
@@ -73,12 +77,37 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
   const handleStartRename = (id: string, name: string) => {
     setMenuId(null);
     setRenameValue(name);
+    setRenameClosing(false);
     setRenamingId(id);
+  };
+
+  const requestCloseRename = () => {
+    if (!renamingId || renameClosing) {
+      return;
+    }
+
+    setRenameClosing(true);
+    window.setTimeout(() => {
+      setRenamingId(null);
+      setRenameClosing(false);
+    }, CLOSE_ANIMATION_MS);
+  };
+
+  const requestCloseDeleteConfirm = () => {
+    if (!confirmDeleteId || deleteConfirmClosing) {
+      return;
+    }
+
+    setDeleteConfirmClosing(true);
+    window.setTimeout(() => {
+      setConfirmDeleteId(null);
+      setDeleteConfirmClosing(false);
+    }, CLOSE_ANIMATION_MS);
   };
 
   const handleRenameSubmit = () => {
     if (renamingId && renameValue.trim()) updateConversationName(renamingId, renameValue.trim());
-    setRenamingId(null);
+    requestCloseRename();
   };
 
   const handlePin = async (id: string, pinned: boolean) => {
@@ -93,13 +122,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
 
   const handleDeleteClick = (id: string) => {
     setMenuId(null);
+    setDeleteConfirmClosing(false);
     setConfirmDeleteId(id);
   };
 
   const handleConfirmDelete = () => {
     if (confirmDeleteId) {
       deleteConversation(confirmDeleteId);
-      setConfirmDeleteId(null);
+      requestCloseDeleteConfirm();
     }
   };
 
@@ -226,13 +256,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
       {/* 删除确认 */}
       {confirmDeleteId && createPortal(
         <div
-          className="delete-confirm-mask"
-          onMouseDown={() => setConfirmDeleteId(null)}
+          className={`delete-confirm-mask ${deleteConfirmClosing ? 'is-closing' : ''}`}
+          onMouseDown={requestCloseDeleteConfirm}
         >
-          <div className="delete-confirm-dialog" onMouseDown={(e) => e.stopPropagation()}>
+          <div className={`delete-confirm-dialog ${deleteConfirmClosing ? 'is-closing' : ''}`} onMouseDown={(e) => e.stopPropagation()}>
             <div className="delete-confirm-text">{t.confirmDelete}</div>
             <div className="delete-popover-actions">
-              <button className="popover-cancel" onClick={() => setConfirmDeleteId(null)}>{t.cancel}</button>
+              <button className="popover-cancel" onClick={requestCloseDeleteConfirm}>{t.cancel}</button>
               <button className="popover-confirm" onClick={handleConfirmDelete}>{t.delete}</button>
             </div>
           </div>
@@ -242,8 +272,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
 
       {/* 重命名弹窗 */}
       {renamingId && createPortal(
-        <div className="delete-confirm-mask" onMouseDown={() => setRenamingId(null)}>
-          <div className="rename-dialog" onMouseDown={(e) => e.stopPropagation()}>
+        <div className={`delete-confirm-mask ${renameClosing ? 'is-closing' : ''}`} onMouseDown={requestCloseRename}>
+          <div className={`rename-dialog ${renameClosing ? 'is-closing' : ''}`} onMouseDown={(e) => e.stopPropagation()}>
             <div className="rename-dialog-title">{t.rename}</div>
             <input
               ref={renameInputRef}
@@ -252,12 +282,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
               onChange={(e) => setRenameValue(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleRenameSubmit();
-                if (e.key === 'Escape') setRenamingId(null);
+                if (e.key === 'Escape') requestCloseRename();
               }}
               autoFocus
             />
             <div className="delete-popover-actions">
-              <button className="popover-cancel" onClick={() => setRenamingId(null)}>{t.cancel}</button>
+              <button className="popover-cancel" onClick={requestCloseRename}>{t.cancel}</button>
               <button className="popover-confirm" style={{ background: 'var(--accent-soft)', borderColor: 'var(--accent)', color: 'var(--accent)' }} onClick={handleRenameSubmit}>{t.save}</button>
             </div>
           </div>

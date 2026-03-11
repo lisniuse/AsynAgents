@@ -89,4 +89,23 @@ describe('shouldAutoSummarizeConversation', () => {
 
     expect(shouldSummarize).toBe(false);
   });
+
+  it('returns false for project mode conversations', () => {
+    const shouldSummarize = shouldAutoSummarizeConversation(
+      {
+        ...baseConversation,
+        projectSession: {
+          mode: 'project',
+          projectPath: 'D:/demo',
+          projectName: 'demo',
+          selectedAt: 123,
+        },
+      },
+      { lastSummarizedMessageCount: 0 },
+      21 * 60 * 1000,
+      20
+    );
+
+    expect(shouldSummarize).toBe(false);
+  });
 });

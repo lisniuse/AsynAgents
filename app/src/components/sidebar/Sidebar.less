@@ -315,6 +315,11 @@
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.4);
+  animation: overlay-fade-in 0.18s ease both;
+
+  &.is-closing {
+    animation: overlay-fade-out 0.16s ease both;
+  }
 }
 
 .delete-confirm-dialog {
@@ -324,6 +329,11 @@
   padding: 16px;
   min-width: 200px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  animation: modal-pop-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+  &.is-closing {
+    animation: modal-pop-out 0.18s ease both;
+  }
 }
 
 .delete-confirm-text {
@@ -339,6 +349,11 @@
   padding: 16px;
   width: 280px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  animation: modal-pop-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+  &.is-closing {
+    animation: modal-pop-out 0.18s ease both;
+  }
 }
 
 .rename-dialog-title {

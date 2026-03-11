@@ -37,7 +37,7 @@ export interface LLMProvider {
 
 function buildToolSection(): string {
   const toolLines = [
-    '- bash: Execute any shell command (package managers, compilers, interpreters, etc.)',
+    '- bash: Execute any shell command (package managers, compilers, interpreters, etc.). For long-running dev servers or watch tasks, set background=true so the process can be managed later.',
     '- write_file: Create or overwrite a file',
     '- read_file: Read file contents',
     '- list_directory: List directory contents',
@@ -161,7 +161,8 @@ function buildProjectModeSection(projectMode?: ProjectModeOptions): string {
 - The active project root is: ${projectPath}
 - Treat this project root as your default working directory for code, file reads, file writes, and shell commands.
 - Prefer inspecting the project structure before making changes.
-- When you make code changes, keep them cohesive and oriented toward buildable results.`;
+- When you make code changes, keep them cohesive and oriented toward buildable results.
+- If you start a dev server, watcher, or other long-running program, prefer using the bash tool with background=true so the user can inspect and manage it from the UI.`;
 }
 
 /** Build the full system prompt, optionally appending skills and user language preference. */

@@ -4,8 +4,9 @@ import { useAppStore } from '@/stores/appStore';
 import { useSSE } from '@/hooks/useSSE';
 import { MessageItem } from './MessageItem';
 import { ProjectPanel } from './ProjectPanel';
-import { BoltIcon, CloseIcon, FolderIcon, PlusIcon, SendIcon } from '@/components/icons';
+import { BoltIcon, CheckIcon, CloseIcon, FolderIcon, PlusIcon, SendIcon } from '@/components/icons';
 import { useT } from '@/i18n';
+import type { ToolCallState } from '@/types';
 import './ChatView.less';
 
 interface ProjectCandidate {
@@ -13,15 +14,57 @@ interface ProjectCandidate {
   path: string;
 }
 
-interface ProjectCheckpoint {
-  id: string;
-  createdAt: number;
-  threadId?: string;
+interface StoredProjectPanelState {
+  open: boolean;
+  width: number;
 }
 
 const PROJECT_PANEL_MIN = 320;
 const CHAT_MAIN_MIN = 250;
 const PROJECT_PANEL_DEFAULT = 520;
+const CLOSE_ANIMATION_MS = 180;
+const PROJECT_PANEL_STORAGE_KEY = 'asynagents.projectPanelState';
+
+function readStoredProjectPanelState(conversationId: string): StoredProjectPanelState | null {
+  try {
+    const raw = window.localStorage.getItem(PROJECT_PANEL_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Record<string, StoredProjectPanelState>;
+    const state = parsed[conversationId];
+    if (!state || typeof state.open !== 'boolean' || typeof state.width !== 'number') {
+      return null;
+    }
+    return {
+      open: state.open,
+      width: Math.max(PROJECT_PANEL_MIN, Math.round(state.width)),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredProjectPanelState(
+  conversationId: string,
+  patch: Partial<StoredProjectPanelState>
+): void {
+  try {
+    const raw = window.localStorage.getItem(PROJECT_PANEL_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) as Record<string, StoredProjectPanelState> : {};
+    const current = parsed[conversationId] ?? {
+      open: false,
+      width: PROJECT_PANEL_DEFAULT,
+    };
+    parsed[conversationId] = {
+      open: typeof patch.open === 'boolean' ? patch.open : current.open,
+      width: typeof patch.width === 'number'
+        ? Math.max(PROJECT_PANEL_MIN, Math.round(patch.width))
+        : current.width,
+    };
+    window.localStorage.setItem(PROJECT_PANEL_STORAGE_KEY, JSON.stringify(parsed));
+  } catch {
+    // Ignore local storage failures.
+  }
+}
 
 export const ChatView: React.FC = () => {
   const t = useT();
@@ -39,6 +82,7 @@ export const ChatView: React.FC = () => {
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  const [projectPickerClosing, setProjectPickerClosing] = useState(false);
   const [projectCandidates, setProjectCandidates] = useState<ProjectCandidate[]>([]);
   const [projectPathInput, setProjectPathInput] = useState('');
   const [projectsLoading, setProjectsLoading] = useState(false);
@@ -46,12 +90,13 @@ export const ChatView: React.FC = () => {
   const [projectError, setProjectError] = useState<string | null>(null);
   const [projectPanelOpen, setProjectPanelOpen] = useState(false);
   const [projectRefreshToken, setProjectRefreshToken] = useState(0);
-  const [projectCheckpoints, setProjectCheckpoints] = useState<ProjectCheckpoint[]>([]);
-  const [projectCheckpointsLoading, setProjectCheckpointsLoading] = useState(false);
   const [projectActionError, setProjectActionError] = useState<string | null>(null);
-  const [restoringCheckpointId, setRestoringCheckpointId] = useState<string | null>(null);
+  const [rollingBackMessageId, setRollingBackMessageId] = useState<string | null>(null);
+  const [rollbackConfirmMessageId, setRollbackConfirmMessageId] = useState<string | null>(null);
+  const [rollbackConfirmClosing, setRollbackConfirmClosing] = useState(false);
   const [applyingProject, setApplyingProject] = useState(false);
   const [projectPanelWidth, setProjectPanelWidth] = useState(PROJECT_PANEL_DEFAULT);
+  const [projectChangedFilesCount, setProjectChangedFilesCount] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -62,11 +107,16 @@ export const ChatView: React.FC = () => {
   const projectDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const projectPanelWidthRef = useRef(PROJECT_PANEL_DEFAULT);
   const projectPanelRafRef = useRef<number | null>(null);
+  const processedWriteToolCallsRef = useRef<Set<string>>(new Set());
+  const projectPickerCloseTimerRef = useRef<number | null>(null);
+  const rollbackCloseTimerRef = useRef<number | null>(null);
+  const restoredProjectPanelConversationRef = useRef<string | null>(null);
 
   const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId);
   const messages = activeConversation?.messages ?? [];
   const activeProject = activeConversation?.projectSession ?? null;
   const streamingMessage = messages.find((message) => message.isStreaming && message.role === 'assistant');
+  const conversationLocked = Boolean(streamingMessage) || isStopping;
 
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -101,6 +151,17 @@ export const ChatView: React.FC = () => {
     document.addEventListener('mousedown', onPointerDown);
     return () => document.removeEventListener('mousedown', onPointerDown);
   }, [attachMenuOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (projectPickerCloseTimerRef.current !== null) {
+        window.clearTimeout(projectPickerCloseTimerRef.current);
+      }
+      if (rollbackCloseTimerRef.current !== null) {
+        window.clearTimeout(rollbackCloseTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     projectPanelWidthRef.current = projectPanelWidth;
@@ -141,6 +202,9 @@ export const ChatView: React.FC = () => {
         projectPanelRafRef.current = null;
       }
       setProjectPanelWidth(projectPanelWidthRef.current);
+      if (activeConversationId && activeProject) {
+        writeStoredProjectPanelState(activeConversationId, { width: projectPanelWidthRef.current });
+      }
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
@@ -154,15 +218,47 @@ export const ChatView: React.FC = () => {
         cancelAnimationFrame(projectPanelRafRef.current);
       }
     };
-  }, []);
+  }, [activeConversationId, activeProject]);
 
   useEffect(() => {
     if (!activeProject) {
       setProjectPanelOpen(false);
-      setProjectCheckpoints([]);
+      setProjectPanelWidth(PROJECT_PANEL_DEFAULT);
+      setProjectChangedFilesCount(0);
       setProjectActionError(null);
+      processedWriteToolCallsRef.current.clear();
+      restoredProjectPanelConversationRef.current = null;
+      return;
     }
-  }, [activeProject]);
+
+    if (!activeConversationId) {
+      return;
+    }
+
+    if (restoredProjectPanelConversationRef.current === activeConversationId) {
+      return;
+    }
+
+    const storedState = readStoredProjectPanelState(activeConversationId);
+    setProjectPanelOpen(storedState?.open ?? true);
+    setProjectPanelWidth(storedState?.width ?? PROJECT_PANEL_DEFAULT);
+    restoredProjectPanelConversationRef.current = activeConversationId;
+  }, [activeConversationId, activeProject]);
+
+  useEffect(() => {
+    if (!activeConversationId || !activeProject) {
+      return;
+    }
+
+    writeStoredProjectPanelState(activeConversationId, {
+      open: projectPanelOpen,
+      width: projectPanelWidth,
+    });
+  }, [activeConversationId, activeProject, projectPanelOpen, projectPanelWidth]);
+
+  useEffect(() => {
+    processedWriteToolCallsRef.current.clear();
+  }, [activeConversationId]);
 
   useEffect(() => {
     const currentThreadId = streamingMessage?.threadId ?? null;
@@ -173,30 +269,29 @@ export const ChatView: React.FC = () => {
   }, [streamingMessage?.threadId, activeProject]);
 
   useEffect(() => {
-    if (!activeConversationId || !activeProject) {
+    if (!activeProject) {
       return;
     }
 
-    const loadCheckpoints = async () => {
-      setProjectCheckpointsLoading(true);
-      setProjectActionError(null);
-      try {
-        const response = await fetch(`/api/conversations/${activeConversationId}/project/checkpoints`);
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to load checkpoints');
+    let shouldRefresh = false;
+    messages.forEach((message) => {
+      message.toolCalls?.forEach((toolCall: ToolCallState) => {
+        const key = `${message.id}:${toolCall.id}`;
+        if (
+          toolCall.name === 'write_file' &&
+          toolCall.status === 'done' &&
+          !processedWriteToolCallsRef.current.has(key)
+        ) {
+          processedWriteToolCallsRef.current.add(key);
+          shouldRefresh = true;
         }
-        setProjectCheckpoints(data as ProjectCheckpoint[]);
-      } catch (err) {
-        setProjectCheckpoints([]);
-        setProjectActionError((err as Error).message);
-      } finally {
-        setProjectCheckpointsLoading(false);
-      }
-    };
+      });
+    });
 
-    void loadCheckpoints();
-  }, [activeConversationId, activeProject, projectRefreshToken]);
+    if (shouldRefresh) {
+      setProjectRefreshToken((token) => token + 1);
+    }
+  }, [activeProject, messages]);
 
   const autoResize = (textarea: HTMLTextAreaElement) => {
     textarea.style.height = 'auto';
@@ -224,6 +319,10 @@ export const ChatView: React.FC = () => {
   };
 
   const handleSend = async () => {
+    if (conversationLocked) {
+      return;
+    }
+
     const trimmed = inputValue.trim();
     if (!trimmed && selectedImages.length === 0) return;
 
@@ -262,6 +361,7 @@ export const ChatView: React.FC = () => {
 
   const openProjectPicker = async () => {
     setAttachMenuOpen(false);
+    setProjectPickerClosing(false);
     setProjectPickerOpen(true);
     setProjectError(null);
     setProjectsLoading(true);
@@ -280,6 +380,31 @@ export const ChatView: React.FC = () => {
     } finally {
       setProjectsLoading(false);
     }
+  };
+
+  const closeProjectPicker = (afterClose?: () => void) => {
+    if (!projectPickerOpen || projectPickerClosing) {
+      return;
+    }
+
+    setProjectPickerClosing(true);
+    projectPickerCloseTimerRef.current = window.setTimeout(() => {
+      setProjectPickerOpen(false);
+      setProjectPickerClosing(false);
+      afterClose?.();
+    }, CLOSE_ANIMATION_MS);
+  };
+
+  const closeRollbackConfirm = () => {
+    if (!rollbackConfirmMessageId || rollbackConfirmClosing) {
+      return;
+    }
+
+    setRollbackConfirmClosing(true);
+    rollbackCloseTimerRef.current = window.setTimeout(() => {
+      setRollbackConfirmMessageId(null);
+      setRollbackConfirmClosing(false);
+    }, CLOSE_ANIMATION_MS);
   };
 
   const handleSelectProject = async (candidatePath?: string) => {
@@ -309,8 +434,9 @@ export const ChatView: React.FC = () => {
       }
 
       await loadConversations();
-      setProjectPickerOpen(false);
-      setProjectPanelOpen(true);
+      closeProjectPicker(() => {
+        setProjectPanelOpenState(true);
+      });
     } catch (err) {
       setProjectError((err as Error).message);
     } finally {
@@ -321,10 +447,22 @@ export const ChatView: React.FC = () => {
   if (!conversationsLoaded) return null;
 
   const isWelcome = !activeConversationId || (messages.length === 0 && !activeProject);
-  const canSend = inputValue.trim().length > 0 || selectedImages.length > 0;
+  const canSend = !conversationLocked && (inputValue.trim().length > 0 || selectedImages.length > 0);
+  const showProjectApplyButton = Boolean(activeProject) && projectChangedFilesCount > 0;
 
   const inputBox = (
-    <div className="input-box">
+    <div className={`input-box ${showProjectApplyButton ? 'has-project-apply' : ''}`}>
+      {showProjectApplyButton && (
+        <button
+          type="button"
+          className="project-apply-floating-btn"
+          onClick={() => void handleApplyProject()}
+          disabled={applyingProject || Boolean(rollingBackMessageId) || Boolean(streamingMessage)}
+        >
+          <CheckIcon size={14} />
+          <span>{applyingProject ? t.projectApplying : t.projectApply}</span>
+        </button>
+      )}
       <div className="input-wrapper">
         <div className="attach-menu-wrap" ref={attachMenuRef}>
           <button
@@ -332,6 +470,7 @@ export const ChatView: React.FC = () => {
             onClick={() => setAttachMenuOpen((open) => !open)}
             title={t.attachMenu}
             type="button"
+            disabled={conversationLocked}
           >
             <PlusIcon size={16} />
           </button>
@@ -392,7 +531,7 @@ export const ChatView: React.FC = () => {
               autoResize(event.target);
             }}
             onKeyDown={handleKeyDown}
-            placeholder={t.inputPlaceholder}
+            placeholder={conversationLocked ? t.conversationBusyHint : t.inputPlaceholder}
             rows={isWelcome ? 3 : 1}
           />
         </div>
@@ -406,33 +545,57 @@ export const ChatView: React.FC = () => {
           <SendIcon size={16} />
         </button>
       </div>
-      <div className="input-hint">{t.inputHint}</div>
+      <div className="input-hint">{conversationLocked ? t.conversationBusyHint : t.inputHint}</div>
     </div>
   );
 
-  const handleRestoreCheckpoint = async (checkpointId: string) => {
+  const handleRollbackToMessage = async (messageId: string) => {
     if (!activeConversationId) {
       return;
     }
 
-    setRestoringCheckpointId(checkpointId);
+    setRollingBackMessageId(messageId);
     setProjectActionError(null);
     try {
+      const selectedMessage = messages.find((message) => message.id === messageId);
+      if (!selectedMessage) {
+        return;
+      }
+
       const response = await fetch(
-        `/api/conversations/${activeConversationId}/project/checkpoints/${checkpointId}/restore`,
-        { method: 'POST' }
+        `/api/conversations/${activeConversationId}/project/rollback-to-message`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messageId }),
+        }
       );
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to restore checkpoint');
+        throw new Error(data.error || 'Failed to roll back project');
       }
+
+      await loadConversations();
+      setInputValue(typeof data.inputMessage === 'string' ? data.inputMessage : selectedMessage.content);
+      setSelectedImages([]);
       setProjectRefreshToken((token) => token + 1);
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+        if (textareaRef.current) {
+          autoResize(textareaRef.current);
+        }
+      });
     } catch (err) {
       setProjectActionError((err as Error).message);
     } finally {
-      setRestoringCheckpointId(null);
+      setRollingBackMessageId(null);
+      closeRollbackConfirm();
     }
   };
+
+  const pendingRollbackMessage = rollbackConfirmMessageId
+    ? messages.find((message) => message.id === rollbackConfirmMessageId) ?? null
+    : null;
 
   const handleApplyProject = async () => {
     if (!activeConversationId) {
@@ -471,6 +634,14 @@ export const ChatView: React.FC = () => {
     document.body.style.userSelect = 'none';
   };
 
+  const setProjectPanelOpenState = (nextOpen: boolean | ((open: boolean) => boolean)) => {
+    const resolved = typeof nextOpen === 'function' ? nextOpen(projectPanelOpen) : nextOpen;
+    setProjectPanelOpen(resolved);
+    if (activeConversationId && activeProject) {
+      writeStoredProjectPanelState(activeConversationId, { open: resolved });
+    }
+  };
+
   return (
     <div className="chat-view">
       {isWelcome ? (
@@ -497,53 +668,17 @@ export const ChatView: React.FC = () => {
           {activeProject && (
             <div className="project-mode-bar">
               <div className="project-mode-copy">
-                <div className="project-mode-badge">{t.projectModeBadge}</div>
+                <div className="project-mode-eyebrow">{t.projectModeBadge}</div>
                 <div className="project-mode-title">{activeProject.projectName}</div>
                 <div className="project-mode-path">{activeProject.projectPath}</div>
-                <div className="project-checkpoints-row">
-                  <div className="project-checkpoints-label">{t.projectCheckpoints}</div>
-                  <div className="project-checkpoints-list">
-                    {projectCheckpointsLoading ? (
-                      <div className="project-checkpoint-empty">{t.projectLoading}</div>
-                    ) : projectCheckpoints.length === 0 ? (
-                      <div className="project-checkpoint-empty">{t.projectNoCheckpoints}</div>
-                    ) : (
-                      projectCheckpoints.map((checkpoint) => (
-                        <button
-                          key={checkpoint.id}
-                          type="button"
-                          className={`project-checkpoint-chip ${restoringCheckpointId === checkpoint.id ? 'pending' : ''}`}
-                          onClick={() => void handleRestoreCheckpoint(checkpoint.id)}
-                          title={t.projectRestore}
-                          disabled={Boolean(restoringCheckpointId) || applyingProject}
-                        >
-                          {restoringCheckpointId === checkpoint.id
-                            ? t.projectRestoring
-                            : new Date(checkpoint.createdAt).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
                 {projectActionError && <div className="project-action-error">{projectActionError}</div>}
               </div>
               <div className="project-mode-actions">
                 <button
                   type="button"
-                  className="project-apply-btn"
-                  onClick={() => void handleApplyProject()}
-                  disabled={applyingProject || Boolean(restoringCheckpointId)}
-                >
-                  {applyingProject ? t.projectApplying : t.projectApply}
-                </button>
-                <button
-                  type="button"
                   className={`project-mode-files-btn ${projectPanelOpen ? 'active' : ''}`}
                   title={t.projectFiles}
-                  onClick={() => setProjectPanelOpen((open) => !open)}
+                  onClick={() => setProjectPanelOpenState((open) => !open)}
                 >
                   <FolderIcon size={16} />
                 </button>
@@ -558,6 +693,13 @@ export const ChatView: React.FC = () => {
                 message={message}
                 onStop={message.isStreaming ? handleStop : undefined}
                 isStopping={isStopping}
+                onRollbackToMessage={
+                  message.role === 'user' && message.checkpointId
+                    ? (selectedMessage) => setRollbackConfirmMessageId(selectedMessage.id)
+                    : undefined
+                }
+                isRollingBack={rollingBackMessageId === message.id}
+                rollbackDisabled={Boolean(streamingMessage)}
               />
             ))}
           </div>
@@ -572,21 +714,26 @@ export const ChatView: React.FC = () => {
               />
               <ProjectPanel
                 conversationId={activeConversationId}
-                projectName={activeProject.projectName}
-                projectPath={activeProject.projectPath}
                 open={projectPanelOpen}
                 refreshToken={projectRefreshToken}
                 width={projectPanelWidth}
-                onClose={() => setProjectPanelOpen(false)}
+                onClose={() => setProjectPanelOpenState(false)}
+                onChangedFilesCountChange={setProjectChangedFilesCount}
               />
             </>
           )}
         </div>
       )}
 
-      {projectPickerOpen && (
-        <div className="project-picker-overlay" onMouseDown={() => setProjectPickerOpen(false)}>
-          <div className="project-picker-modal" onMouseDown={(event) => event.stopPropagation()}>
+      {(projectPickerOpen || projectPickerClosing) && (
+        <div
+          className={`project-picker-overlay ${projectPickerClosing ? 'is-closing' : ''}`}
+          onMouseDown={() => closeProjectPicker()}
+        >
+          <div
+            className={`project-picker-modal ${projectPickerClosing ? 'is-closing' : ''}`}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
             <div className="project-picker-header">
               <div>
                 <div className="project-picker-title">{t.selectProject}</div>
@@ -595,7 +742,7 @@ export const ChatView: React.FC = () => {
               <button
                 type="button"
                 className="project-picker-close"
-                onClick={() => setProjectPickerOpen(false)}
+                onClick={() => closeProjectPicker()}
                 aria-label={t.cancel}
               >
                 <CloseIcon size={16} />
@@ -641,7 +788,7 @@ export const ChatView: React.FC = () => {
               <button
                 type="button"
                 className="project-picker-cancel"
-                onClick={() => setProjectPickerOpen(false)}
+                onClick={() => closeProjectPicker()}
               >
                 {t.cancel}
               </button>
@@ -652,6 +799,66 @@ export const ChatView: React.FC = () => {
                 onClick={() => void handleSelectProject()}
               >
                 {projectSaving ? t.projectSelecting : t.projectSelectConfirm}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(pendingRollbackMessage || rollbackConfirmClosing) && pendingRollbackMessage && (
+        <div
+          className={`project-picker-overlay project-confirm-overlay ${rollbackConfirmClosing ? 'is-closing' : ''}`}
+          onMouseDown={() => {
+            if (!rollingBackMessageId) {
+              closeRollbackConfirm();
+            }
+          }}
+        >
+          <div
+            className={`project-confirm-modal ${rollbackConfirmClosing ? 'is-closing' : ''}`}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="project-confirm-header">
+              <div>
+                <div className="project-confirm-title">{t.projectRollbackTitle}</div>
+                <div className="project-confirm-subtitle">{t.projectRollbackConfirm}</div>
+              </div>
+              <button
+                type="button"
+                className="project-picker-close"
+                onClick={() => {
+                  if (!rollingBackMessageId) {
+                    closeRollbackConfirm();
+                  }
+                }}
+                aria-label={t.cancel}
+                disabled={Boolean(rollingBackMessageId)}
+              >
+                <CloseIcon size={16} />
+              </button>
+            </div>
+
+            <div className="project-confirm-body">
+              <div className="project-confirm-preview-label">{t.projectRollbackPreview}</div>
+              <div className="project-confirm-preview">{pendingRollbackMessage.content}</div>
+            </div>
+
+            <div className="project-picker-footer">
+              <button
+                type="button"
+                className="project-picker-cancel"
+                onClick={() => closeRollbackConfirm()}
+                disabled={Boolean(rollingBackMessageId)}
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="button"
+                className="project-confirm-confirm"
+                disabled={Boolean(rollingBackMessageId)}
+                onClick={() => void handleRollbackToMessage(pendingRollbackMessage.id)}
+              >
+                {rollingBackMessageId ? t.projectRollbacking : t.projectRollback}
               </button>
             </div>
           </div>

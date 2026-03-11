@@ -38,10 +38,16 @@ export interface ProjectFileSnapshot {
   baselineContent: string | null;
 }
 
+export interface ProjectChangedFile {
+  path: string;
+  changeType: 'added' | 'removed' | 'modified';
+}
+
 export interface ProjectCheckpointSummary {
   id: string;
   createdAt: number;
   threadId?: string;
+  messageId?: string;
 }
 
 function sessionDir(conversationId: string): string {
@@ -359,16 +365,54 @@ export async function readProjectFile(
   };
 }
 
+export async function listChangedProjectFiles(
+  conversationId: string
+): Promise<ProjectChangedFile[]> {
+  const { workingRoot, baselineRoot } = await getProjectRoots(conversationId);
+  const [workingFiles, baselineFiles] = await Promise.all([
+    listTrackedFiles(workingRoot),
+    listTrackedFiles(baselineRoot),
+  ]);
+
+  const allPaths = Array.from(
+    new Set(
+      [...workingFiles, ...baselineFiles].map((filePath) => filePath.replace(/\\/g, '/'))
+    )
+  ).sort((a, b) => a.localeCompare(b));
+
+  const changes = await Promise.all(
+    allPaths.map(async (path) => {
+      const snapshot = await readProjectFile(conversationId, path);
+      if (!snapshot.baselineExists && snapshot.workingExists) {
+        return { path, changeType: 'added' as const };
+      }
+      if (snapshot.baselineExists && !snapshot.workingExists) {
+        return { path, changeType: 'removed' as const };
+      }
+      if ((snapshot.baselineContent ?? '') !== (snapshot.workingContent ?? '')) {
+        return { path, changeType: 'modified' as const };
+      }
+      return null;
+    })
+  );
+
+  return changes.filter((change): change is ProjectChangedFile => change !== null);
+}
+
 export async function createProjectCheckpoint(
   conversationId: string,
-  threadId?: string
+  options: {
+    threadId?: string;
+    messageId?: string;
+  } = {}
 ): Promise<ProjectCheckpointSummary> {
   const { workingRoot } = await getProjectRoots(conversationId);
   const checkpointId = `cp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const summary: ProjectCheckpointSummary = {
     id: checkpointId,
     createdAt: Date.now(),
-    ...(threadId ? { threadId } : {}),
+    ...(options.threadId ? { threadId: options.threadId } : {}),
+    ...(options.messageId ? { messageId: options.messageId } : {}),
   };
 
   await mkdir(checkpointDir(conversationId, checkpointId), { recursive: true });

@@ -343,6 +343,26 @@ export const MenuIcon: React.FC<IconProps> = ({ size = 18, className, style }) =
   </svg>
 );
 
+export const RefreshIcon: React.FC<IconProps> = ({ size = 16, className, style }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    style={style}
+  >
+    <path d="M21 3v6h-6" />
+    <path d="M3 21v-6h6" />
+    <path d="M20 9a8 8 0 0 0-13.66-3.66L3 9" />
+    <path d="M4 15a8 8 0 0 0 13.66 3.66L21 15" />
+  </svg>
+);
+
 export const CloseIcon: React.FC<IconProps> = ({ size = 18, className, style }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className={className} style={style}>
     <line x1="6" y1="6" x2="18" y2="18" />

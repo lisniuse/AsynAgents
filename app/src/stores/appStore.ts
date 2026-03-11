@@ -21,6 +21,7 @@ export interface AppSettings {
   workspace: string;
   ui: {
     showToolCalls: boolean;
+    autoCollapseToolCalls: boolean;
     language?: 'zh' | 'en';
     userLanguage?: 'zh' | 'en' | 'auto';
   };

@@ -1,10 +1,17 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/appStore';
+import { translations, type Language } from '@/i18n';
 import type { SSEEvent, ToolCallData, ToolResultData } from '@/types';
 
 const API_BASE = '/api';
 const SUMMARY_COMMANDS = new Set(['/summarize']);
+
+function getSummaryFeedbackText(key: 'summaryUnavailableInProjectMode' | 'summaryFailed'): string {
+  const settings = useAppStore.getState().settings;
+  const language = (settings?.ui?.language as Language) ?? 'zh';
+  return translations[language]?.[key] ?? translations.zh[key];
+}
 
 // ─── Per-conversation session state in localStorage ───────────────────────────
 // Tracks lastIndex (next event to request on reconnect) and whether an agent
@@ -324,13 +331,24 @@ export const useSSE = () => {
           return;
         }
 
+        if (conversation.projectSession) {
+          useAppStore.getState().addMessage(conversationId, {
+            id: 'msg_' + Math.random().toString(36).substring(2, 15),
+            role: 'assistant',
+            content: getSummaryFeedbackText('summaryUnavailableInProjectMode'),
+            timestamp: Date.now(),
+            kind: 'summary_note',
+          });
+          return;
+        }
+
         try {
           const response = await fetch(`${API_BASE}/conversations/${conversationId}/summarize`, {
             method: 'POST',
           });
           const data = await response.json();
           if (!response.ok) {
-            throw new Error(data.error || 'Failed to summarize conversation');
+            throw new Error(data.error || getSummaryFeedbackText('summaryFailed'));
           }
 
           useAppStore.getState().addMessage(conversationId, {
@@ -352,6 +370,13 @@ export const useSSE = () => {
           }
         } catch (err) {
           console.error('Summarize conversation error:', err);
+          useAppStore.getState().addMessage(conversationId, {
+            id: 'msg_' + Math.random().toString(36).substring(2, 15),
+            role: 'assistant',
+            content: (err as Error).message || getSummaryFeedbackText('summaryFailed'),
+            timestamp: Date.now(),
+            kind: 'summary_note',
+          });
         }
         return;
       }
@@ -362,6 +387,9 @@ export const useSSE = () => {
       }
 
       const existingConversation = useAppStore.getState().conversations.find(c => c.id === conversationId);
+      if (existingConversation?.messages.some((msg) => msg.role === 'assistant' && msg.isStreaming)) {
+        return;
+      }
       const conversationHistory = existingConversation?.messages
         .filter((msg) => msg.kind !== 'summary_note')
         .map((msg) => ({
@@ -398,6 +426,7 @@ export const useSSE = () => {
             conversationId,
             conversationHistory,
             message,
+            messageId: userMsgId,
             images,
           }),
         });
@@ -405,6 +434,9 @@ export const useSSE = () => {
         if (!response.ok) throw new Error('Failed to send message');
 
         const data = await response.json();
+        if (data.checkpointId) {
+          updateMessage(conversationId, userMsgId, { checkpointId: data.checkpointId });
+        }
         if (data.threadId) {
           registerAgent(data.threadId, new AbortController());
           currentThreadIdRef.current = data.threadId;
@@ -413,7 +445,7 @@ export const useSSE = () => {
         console.error('Send message error:', err);
       }
     },
-    [activeConversationId, navigate, registerAgent]
+    [activeConversationId, navigate, registerAgent, updateMessage]
   );
 
   // ── Stop current agent ─────────────────────────────────────────────────────

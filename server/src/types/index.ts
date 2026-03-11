@@ -19,11 +19,13 @@ export interface ChatRequest {
   conversationId: string;
   conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
   message: string;
+  messageId?: string;
   images?: string[]; // base64 data URLs
 }
 
 export interface ChatResponse {
   threadId: string;
+  checkpointId?: string;
 }
 
 export interface ToolCallData {
@@ -37,6 +39,24 @@ export interface ToolResultData {
   toolName: string;
   result: string;
   isError: boolean;
+}
+
+export interface ManagedProcessInfo {
+  id: string;
+  conversationId: string;
+  name: string;
+  command: string;
+  cwd: string;
+  pid: number;
+  status: 'running' | 'stopped' | 'exited' | 'failed';
+  startedAt: number;
+  endedAt?: number;
+  exitCode?: number | null;
+  signal?: string | null;
+  ports: number[];
+  urls: string[];
+  recentOutput: string;
+  logFile: string;
 }
 
 export interface AssistantImage {
@@ -66,6 +86,7 @@ export interface StoredMessage {
   role: 'user' | 'assistant';
   content: string;
   images?: string[];
+  checkpointId?: string;
   thinking?: string;
   toolCalls?: StoredToolCall[];
   timestamp: number;

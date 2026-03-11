@@ -162,6 +162,7 @@ export class SubAgent {
           }
           const execution = await executeTool(tc.name, tc.input, {
             rootDir: projectPath,
+            conversationId,
           });
           const output = execution.output;
           const isError = output.startsWith('Error') || output.startsWith('Command failed');

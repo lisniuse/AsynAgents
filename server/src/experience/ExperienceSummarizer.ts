@@ -99,6 +99,10 @@ function getRelevantMessages(messages: StoredMessage[]): StoredMessage[] {
   return messages.filter((message) => message.kind !== 'summary_note');
 }
 
+export function supportsExperienceSummaries(conversation: StoredConversation): boolean {
+  return !conversation.projectSession;
+}
+
 function buildConversationTranscript(conversation: StoredConversation): string {
   const parts: string[] = [];
 
@@ -305,6 +309,10 @@ export function shouldAutoSummarizeConversation(
   now: number,
   idleMinutes: number
 ): boolean {
+  if (!supportsExperienceSummaries(conversation)) {
+    return false;
+  }
+
   const messages = getRelevantMessages(conversation.messages);
   if (messages.length === 0) {
     return false;
@@ -331,6 +339,13 @@ export async function summarizeConversation(
   conversation: StoredConversation,
   options: SummarizeOptions
 ): Promise<SummarizeResult> {
+  if (!supportsExperienceSummaries(conversation)) {
+    return {
+      skipped: true,
+      reason: 'Experience summaries are not available for project mode conversations.',
+    };
+  }
+
   const relevantMessages = getRelevantMessages(conversation.messages);
   if (relevantMessages.length === 0) {
     return { skipped: true, reason: 'Conversation has no messages to summarize.' };

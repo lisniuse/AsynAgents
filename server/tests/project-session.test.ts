@@ -6,6 +6,7 @@ import {
   applyProjectBaseline,
   createProjectCheckpoint,
   initializeProjectSession,
+  listChangedProjectFiles,
   listProjectCheckpoints,
   listProjectTree,
   readProjectFile,
@@ -71,11 +72,15 @@ describe('ProjectSessionStorage', () => {
     createdPaths.push(sessionDir(conversationId));
 
     await initializeProjectSession(conversationId, projectRoot);
-    const checkpoint = await createProjectCheckpoint(conversationId, 'thread-1');
+    const checkpoint = await createProjectCheckpoint(conversationId, {
+      threadId: 'thread-1',
+      messageId: 'msg-1',
+    });
     await writeFile(join(projectRoot, 'src', 'index.ts'), 'export const answer = 128;\n', 'utf8');
 
     const checkpoints = await listProjectCheckpoints(conversationId);
     expect(checkpoints[0]?.id).toBe(checkpoint.id);
+    expect(checkpoints[0]?.messageId).toBe('msg-1');
 
     await restoreProjectCheckpoint(conversationId, checkpoint.id);
     const restored = await readProjectFile(conversationId, 'src/index.ts');
@@ -85,5 +90,26 @@ describe('ProjectSessionStorage', () => {
     await applyProjectBaseline(conversationId);
     const applied = await readProjectFile(conversationId, 'src/index.ts');
     expect(applied.baselineContent).toContain('256');
+  });
+
+  it('lists added, removed, and modified files against the baseline', async () => {
+    const projectRoot = await createTempProject();
+    const conversationId = `project-changes-${Date.now()}`;
+    createdPaths.push(sessionDir(conversationId));
+
+    await initializeProjectSession(conversationId, projectRoot);
+    await writeFile(join(projectRoot, 'src', 'index.ts'), 'export const answer = 84;\n', 'utf8');
+    await writeFile(join(projectRoot, 'src', 'added.ts'), 'export const added = true;\n', 'utf8');
+    await rm(join(projectRoot, 'README.md'), { force: true });
+
+    const changes = await listChangedProjectFiles(conversationId);
+
+    expect(changes).toEqual(
+      expect.arrayContaining([
+        { path: 'src/index.ts', changeType: 'modified' },
+        { path: 'src/added.ts', changeType: 'added' },
+        { path: 'README.md', changeType: 'removed' },
+      ])
+    );
   });
 });

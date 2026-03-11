@@ -40,6 +40,7 @@ export interface Config {
   };
   ui: {
     showToolCalls: boolean;
+    autoCollapseToolCalls: boolean;
     language: 'zh' | 'en';
     userLanguage: 'zh' | 'en' | 'auto';
   };
@@ -91,6 +92,7 @@ const defaultConfig: Config = {
   },
   ui: {
     showToolCalls: true,
+    autoCollapseToolCalls: false,
     language: 'zh',
     userLanguage: 'auto',
   },

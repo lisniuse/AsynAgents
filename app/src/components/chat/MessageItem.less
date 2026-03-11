@@ -18,12 +18,37 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .msg-user-label {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-3);
+}
+
+.msg-user-checkpoint-btn {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.1);
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
+
+  &:hover:not(:disabled) {
+    background: rgba(245, 158, 11, 0.16);
+    border-color: rgba(245, 158, 11, 0.3);
+  }
+
+  &:disabled {
+    opacity: 0.72;
+    cursor: default;
+  }
 }
 
 .msg-user-images {
@@ -116,6 +141,11 @@
   z-index: 1000;
   overflow: hidden;
   background: rgba(0, 0, 0, 0.78);
+  animation: overlay-fade-in 0.18s ease both;
+
+  &.is-closing {
+    animation: overlay-fade-out 0.16s ease both;
+  }
 }
 
 .image-lightbox-stage {
@@ -141,6 +171,11 @@
   user-select: none;
   will-change: transform;
   touch-action: none;
+  animation: modal-pop-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+  &.is-closing {
+    animation: modal-pop-out 0.18s ease both;
+  }
 }
 
 .image-lightbox-fallback {
@@ -151,6 +186,11 @@
   min-height: 220px;
   transform: translate(-50%, -50%);
   background: rgba(17, 24, 39, 0.88);
+  animation: modal-pop-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+  &.is-closing {
+    animation: modal-pop-out 0.18s ease both;
+  }
 }
 
 .image-lightbox-toolbar {
@@ -161,6 +201,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  animation: modal-pop-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+  &.is-closing {
+    animation: modal-pop-out 0.18s ease both;
+  }
 }
 
 .image-lightbox-action {
@@ -196,6 +241,11 @@
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
+  animation: modal-pop-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+  &.is-closing {
+    animation: modal-pop-out 0.18s ease both;
+  }
 }
 
 .msg-user-bubble {

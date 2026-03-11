@@ -22,11 +22,17 @@ interface SettingsModalProps {
 type UiSettings = NonNullable<AppSettings['ui']>;
 type Section = 'model' | 'workspace' | 'knowledge' | 'ui' | 'persona';
 
-const DEFAULT_UI: UiSettings = { showToolCalls: true, language: 'zh', userLanguage: 'auto' };
+const DEFAULT_UI: UiSettings = {
+  showToolCalls: true,
+  autoCollapseToolCalls: false,
+  language: 'zh',
+  userLanguage: 'auto',
+};
 const DEFAULT_PERSONA = { aiName: '', userName: '', aiAvatar: '', userAvatar: '', personality: '' };
 const DEFAULT_PYTHON = { path: 'python' };
 const PERSONA_NAME_MAX_LENGTH = 32;
 const PERSONA_NAME_ALLOWED = /[A-Za-z0-9_\u3400-\u9FFF]/gu;
+const CLOSE_ANIMATION_MS = 180;
 
 function sortSkills(skills: SkillItem[]): SkillItem[] {
   return [...skills].sort((a, b) => a.name.localeCompare(b.name));
@@ -61,8 +67,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const [togglingSkill, setTogglingSkill] = useState<string | null>(null);
   const [togglingExperience, setTogglingExperience] = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
   const aiAvatarInputRef = useRef<HTMLInputElement>(null);
   const userAvatarInputRef = useRef<HTMLInputElement>(null);
+  const closeTimerRef = useRef<number | null>(null);
+  const saveCloseTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!settings) return;
@@ -82,6 +91,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   useEffect(() => {
     setMobileNavOpen(false);
   }, [activeSection]);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+      if (saveCloseTimerRef.current !== null) {
+        window.clearTimeout(saveCloseTimerRef.current);
+      }
+    };
+  }, []);
 
   const refreshPythonStatus = (data?: { pythonAvailable?: boolean; pythonPath?: string } | null) => {
     if (!data) return;
@@ -181,6 +201,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setForm({ ...form, ui: { ...ui, ...patch } });
   };
 
+  const requestClose = () => {
+    if (closing) {
+      return;
+    }
+
+    setClosing(true);
+    closeTimerRef.current = window.setTimeout(() => {
+      onClose();
+    }, CLOSE_ANIMATION_MS);
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
@@ -193,7 +224,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
       return;
     }
     setSaved(true);
-    window.setTimeout(() => onClose(), 800);
+    saveCloseTimerRef.current = window.setTimeout(() => requestClose(), 800);
   };
 
   const handleToggleSkill = async (skill: SkillItem) => {
@@ -217,8 +248,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   ];
 
   return createPortal(
-    <div className="settings-overlay" onMouseDown={onClose}>
-      <div className="settings-modal" onMouseDown={(event) => event.stopPropagation()}>
+    <div className={`settings-overlay ${closing ? 'is-closing' : ''}`} onMouseDown={requestClose}>
+      <div
+        className={`settings-modal ${closing ? 'is-closing' : ''}`}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <div className="settings-header">
           <div className="settings-header-main">
             <button
@@ -231,7 +265,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             </button>
             <div className="settings-title">{t.settingsTitle}</div>
           </div>
-          <button type="button" className="settings-close" onClick={onClose} aria-label={t.cancel}>
+          <button type="button" className="settings-close" onClick={requestClose} aria-label={t.cancel}>
             <CloseIcon size={18} />
           </button>
         </div>
@@ -538,6 +572,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     <span className="toggle-knob" />
                   </button>
                 </div>
+
+                {ui.showToolCalls && (
+                  <div className="settings-field settings-field-toggle">
+                    <div className="toggle-label">
+                      <span>{t.autoCollapseToolCalls}</span>
+                      <span className="field-hint">{t.autoCollapseToolCallsHint}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className={`toggle-switch ${ui.autoCollapseToolCalls ? 'on' : ''}`}
+                      onClick={() =>
+                        setUiField({ autoCollapseToolCalls: !ui.autoCollapseToolCalls })
+                      }
+                    >
+                      <span className="toggle-knob" />
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
