@@ -89,6 +89,7 @@ export class SubAgent {
     const provider = await createProvider(conversationHistory, userMessage, images);
     let finalText = '';
     let thinkingText = '';
+    let finalImages: string[] = [];
 
     try {
       for (let i = 0; i < MAX_ITERATIONS; i++) {
@@ -152,8 +153,12 @@ export class SubAgent {
             results.push({ id: tc.id, result: output });
             continue;
           }
-          const output = await executeTool(tc.name, tc.input);
+          const execution = await executeTool(tc.name, tc.input);
+          const output = execution.output;
           const isError = output.startsWith('Error') || output.startsWith('Command failed');
+          if (execution.images && execution.images.length > 0) {
+            finalImages = [...finalImages, ...execution.images];
+          }
           logger.info('Tool execution completed', { toolName: tc.name, isError, outputLength: output.length });
           publish('tool_result', { id: tc.id, toolName: tc.name, result: output, isError });
           results.push({ id: tc.id, result: output });
@@ -168,7 +173,7 @@ export class SubAgent {
         publish('agent_stopped', { threadId, reason: 'user_requested' });
       } else {
         logger.info('Agent completed successfully', { finalTextLength: finalText.length });
-        publish('agent_done', { success: true, text: finalText, thinking: thinkingText });
+        publish('agent_done', { success: true, text: finalText, thinking: thinkingText, images: finalImages });
       }
       
       return finalText;

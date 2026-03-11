@@ -22,13 +22,105 @@
   max-width: 75%;
 }
 
-.msg-user-image {
+.message-image-button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.message-image {
   max-width: 240px;
   max-height: 240px;
   border-radius: 12px;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
   border: 1px solid var(--border2);
+}
+
+.msg-assistant-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.78);
+}
+
+.image-lightbox-stage {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  cursor: grab;
+
+  &.is-dragging {
+    cursor: grabbing;
+  }
+}
+
+.image-lightbox-image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  max-width: none;
+  max-height: none;
+  border-radius: 12px;
+  box-shadow: 0 12px 60px rgba(0, 0, 0, 0.45);
+  transform-origin: center center;
+  user-select: none;
+  will-change: transform;
+  touch-action: none;
+}
+
+.image-lightbox-toolbar {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.image-lightbox-action {
+  min-width: 40px;
+  height: 40px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+}
+
+.image-lightbox-reset {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.image-lightbox-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 3;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .msg-user-bubble {
@@ -331,6 +423,22 @@
     font-size: 13px;
     line-height: 1.6;
     background: transparent !important;
+  }
+
+  img,
+  .md-image {
+    display: block;
+    max-width: min(100%, 680px);
+    width: auto;
+    height: auto;
+    max-height: 420px;
+    margin: 12px 0;
+    border-radius: 14px;
+    border: 1px solid var(--border2);
+    object-fit: contain;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+    cursor: zoom-in;
+    background: var(--surface);
   }
 }
 

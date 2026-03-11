@@ -41,6 +41,7 @@ function buildToolSection(): string {
     '- write_file: Create or overwrite a file',
     '- read_file: Read file contents',
     '- list_directory: List directory contents',
+    '- send_image: Save an image into the static images directory and attach it to the assistant reply',
     '- get_experience: Read a saved experience note in full',
     '- get_skill: Read a skill instruction file in full',
   ];

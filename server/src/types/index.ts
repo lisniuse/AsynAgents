@@ -39,6 +39,11 @@ export interface ToolResultData {
   isError: boolean;
 }
 
+export interface AssistantImage {
+  url: string;
+  alt?: string;
+}
+
 export interface StoredToolCall {
   id: string;
   name: string;
@@ -53,6 +58,7 @@ export interface StoredMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  images?: string[];
   thinking?: string;
   toolCalls?: StoredToolCall[];
   timestamp: number;

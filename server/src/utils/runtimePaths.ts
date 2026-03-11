@@ -42,3 +42,7 @@ export function resolveSystemSkillsDir(): string {
 
   return join(REPO_ROOT, 'skills');
 }
+
+export function resolveStaticImagesDir(): string {
+  return join(resolveStaticDir(), 'images');
+}

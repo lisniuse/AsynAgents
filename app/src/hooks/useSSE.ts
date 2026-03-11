@@ -91,6 +91,7 @@ export const useSSE = () => {
               id: assistantMsgId,
               role: 'assistant',
               content: '',
+              images: [],
               thinking: '',
               timestamp: Date.now(),
               isStreaming: true,
@@ -102,6 +103,7 @@ export const useSSE = () => {
             updateMessage(conversationId, existing.id, {
               isStreaming: true,
               content: '',
+              images: [],
               thinking: '',
               toolCalls: [],
             });
@@ -174,10 +176,11 @@ export const useSSE = () => {
             .find(c => c.id === conversationId)
             ?.messages.find(m => m.role === 'assistant' && m.threadId === event.threadId);
           if (msg) {
-            const doneData = event.data as { text?: string; thinking?: string };
+            const doneData = event.data as { text?: string; thinking?: string; images?: string[] };
             updateMessage(conversationId, msg.id, {
               isStreaming: false,
               ...(typeof doneData.text === 'string' ? { content: doneData.text } : {}),
+              ...(Array.isArray(doneData.images) ? { images: doneData.images } : {}),
               ...(typeof doneData.thinking === 'string' ? { thinking: doneData.thinking } : {}),
             });
           }
@@ -217,6 +220,27 @@ export const useSSE = () => {
         case 'error': {
           console.error('Agent error:', event.data);
           updateSession(conversationId, { inProgress: false });
+          const msg = useAppStore.getState().conversations
+            .find(c => c.id === conversationId)
+            ?.messages.find(m => m.role === 'assistant' && m.threadId === event.threadId);
+          if (msg) {
+            const errorMessage =
+              (event.data as { message?: string })?.message || 'Agent execution failed.';
+            updateMessage(conversationId, msg.id, {
+              isStreaming: false,
+              toolCalls: msg.toolCalls?.map((toolCall) =>
+                toolCall.status === 'running'
+                  ? {
+                      ...toolCall,
+                      status: 'error',
+                      isError: true,
+                      result: toolCall.result || `Agent error: ${errorMessage}`,
+                    }
+                  : toolCall
+              ),
+              content: msg.content || `Agent error: ${errorMessage}`,
+            });
+          }
           if (currentThreadIdRef.current) {
             unregisterAgent(currentThreadIdRef.current);
             currentThreadIdRef.current = null;

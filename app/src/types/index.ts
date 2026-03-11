@@ -45,7 +45,7 @@ export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  images?: string[]; // base64 data URLs (user messages only)
+  images?: string[];
   thinking?: string;
   timestamp: number;
   toolCalls?: ToolCallState[];
