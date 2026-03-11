@@ -10,6 +10,8 @@ import {
   MonitorIcon,
   BrainIcon,
   ListManageIcon,
+  MenuIcon,
+  CloseIcon,
 } from '@/components/icons';
 import './SettingsModal.less';
 
@@ -50,6 +52,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const [activeSection, setActiveSection] = useState<Section>('model');
   const [togglingSkill, setTogglingSkill] = useState<string | null>(null);
   const [togglingExperience, setTogglingExperience] = useState<string | null>(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     if (!settings) return;
@@ -63,6 +66,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   useEffect(() => {
     void loadCatalog();
   }, [loadCatalog]);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [activeSection]);
 
   const refreshPythonStatus = (data?: { pythonAvailable?: boolean; pythonPath?: string } | null) => {
     if (!data) return;
@@ -147,19 +154,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
   return createPortal(
     <div className="settings-overlay" onMouseDown={onClose}>
-      <div className="settings-modal" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="settings-modal" onMouseDown={(event) => event.stopPropagation()}>
         <div className="settings-header">
-          <div className="settings-title">{t.settingsTitle}</div>
-          <button className="settings-close" onClick={onClose} aria-label={t.cancel}>×</button>
+          <div className="settings-header-main">
+            <button
+              type="button"
+              className="settings-menu-toggle"
+              onClick={() => setMobileNavOpen(true)}
+              aria-label={t.settingsTitle}
+            >
+              <MenuIcon size={18} />
+            </button>
+            <div className="settings-title">{t.settingsTitle}</div>
+          </div>
+          <button type="button" className="settings-close" onClick={onClose} aria-label={t.cancel}>
+            <CloseIcon size={18} />
+          </button>
         </div>
 
         <div className="settings-layout">
-          <nav className="settings-nav">
+          {mobileNavOpen && (
+            <button
+              type="button"
+              className="settings-nav-backdrop"
+              onClick={() => setMobileNavOpen(false)}
+              aria-label={t.cancel}
+            />
+          )}
+
+          <nav className={`settings-nav ${mobileNavOpen ? 'mobile-open' : ''}`}>
             {navItems.map((item) => (
               <button
                 key={item.key}
+                type="button"
                 className={`settings-nav-item ${activeSection === item.key ? 'active' : ''}`}
-                onClick={() => setActiveSection(item.key)}
+                onClick={() => {
+                  setActiveSection(item.key);
+                  setMobileNavOpen(false);
+                }}
               >
                 <span className="settings-nav-icon">{item.icon}</span>
                 <span className="settings-nav-label">{item.label}</span>
@@ -174,12 +206,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   <label>{t.apiProvider}</label>
                   <div className="provider-tabs">
                     <button
+                      type="button"
                       className={`provider-tab ${form.provider === 'openai' ? 'active' : ''}`}
                       onClick={() => setProvider('openai')}
                     >
                       {t.openaiCompatible}
                     </button>
                     <button
+                      type="button"
                       className={`provider-tab ${form.provider === 'anthropic' ? 'active' : ''}`}
                       onClick={() => setProvider('anthropic')}
                     >
@@ -195,7 +229,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       <input
                         type="password"
                         value={form.openai.apiKey}
-                        onChange={(e) => setOpenAIField('apiKey', e.target.value)}
+                        onChange={(event) => setOpenAIField('apiKey', event.target.value)}
                         placeholder="sk-..."
                       />
                     </div>
@@ -204,7 +238,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       <input
                         type="text"
                         value={form.openai.baseUrl}
-                        onChange={(e) => setOpenAIField('baseUrl', e.target.value)}
+                        onChange={(event) => setOpenAIField('baseUrl', event.target.value)}
                         placeholder="https://api.openai.com/v1"
                       />
                     </div>
@@ -213,7 +247,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       <input
                         type="text"
                         value={form.openai.model}
-                        onChange={(e) => setOpenAIField('model', e.target.value)}
+                        onChange={(event) => setOpenAIField('model', event.target.value)}
                         placeholder="gpt-4o"
                       />
                     </div>
@@ -225,7 +259,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       <input
                         type="password"
                         value={form.anthropic.apiKey}
-                        onChange={(e) => setAnthropicField('apiKey', e.target.value)}
+                        onChange={(event) => setAnthropicField('apiKey', event.target.value)}
                         placeholder="sk-ant-..."
                       />
                     </div>
@@ -236,7 +270,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       <input
                         type="text"
                         value={form.anthropic.baseUrl ?? ''}
-                        onChange={(e) => setAnthropicField('baseUrl', e.target.value)}
+                        onChange={(event) => setAnthropicField('baseUrl', event.target.value)}
                         placeholder="https://api.anthropic.com"
                       />
                     </div>
@@ -245,7 +279,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       <input
                         type="text"
                         value={form.anthropic.model}
-                        onChange={(e) => setAnthropicField('model', e.target.value)}
+                        onChange={(event) => setAnthropicField('model', event.target.value)}
                         placeholder="claude-opus-4-6"
                       />
                     </div>
@@ -258,10 +292,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     type="number"
                     min={0}
                     value={form.maxIterations ?? 0}
-                    onChange={(e) =>
+                    onChange={(event) =>
                       setForm({
                         ...form,
-                        maxIterations: Math.max(0, Number.parseInt(e.target.value, 10) || 0),
+                        maxIterations: Math.max(0, Number.parseInt(event.target.value, 10) || 0),
                       })}
                   />
                   <div className="field-hint">{t.maxIterationsHint}</div>
@@ -278,7 +312,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   <input
                     type="text"
                     value={form.python.path}
-                    onChange={(e) => setPythonPath(e.target.value)}
+                    onChange={(event) => setPythonPath(event.target.value)}
                     placeholder="python"
                   />
                   <div className="field-hint">{t.pythonPathHint}</div>
@@ -296,7 +330,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   <input
                     type="text"
                     value={form.workspace}
-                    onChange={(e) => setWorkspace(e.target.value)}
+                    onChange={(event) => setWorkspace(event.target.value)}
                     placeholder="~/.asynagents/workspace"
                   />
                   <div className="field-hint">{t.workspaceDirHint}</div>
@@ -322,6 +356,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                           </div>
                         </div>
                         <button
+                          type="button"
                           className={`toggle-switch ${skill.enabled ? 'on' : ''}`}
                           onClick={() => void handleToggleSkill(skill)}
                           disabled={togglingSkill === skill.name}
@@ -358,6 +393,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                           )}
                         </div>
                         <button
+                          type="button"
                           className={`toggle-switch ${experience.enabled ? 'on' : ''}`}
                           onClick={() => void handleToggleExperience(experience)}
                           disabled={togglingExperience === experience.fileName}
@@ -381,16 +417,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   <label>{t.interfaceLanguage}</label>
                   <div className="provider-tabs">
                     <button
+                      type="button"
                       className={`provider-tab ${ui.language === 'zh' ? 'active' : ''}`}
                       onClick={() => setUiField({ language: 'zh' })}
                     >
-                      中文
+                      {t.langZh}
                     </button>
                     <button
+                      type="button"
                       className={`provider-tab ${ui.language === 'en' ? 'active' : ''}`}
                       onClick={() => setUiField({ language: 'en' })}
                     >
-                      English
+                      {t.langEn}
                     </button>
                   </div>
                 </div>
@@ -399,22 +437,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   <label>{t.userLanguageLabel}</label>
                   <div className="provider-tabs">
                     <button
+                      type="button"
                       className={`provider-tab ${ui.userLanguage === 'auto' ? 'active' : ''}`}
                       onClick={() => setUiField({ userLanguage: 'auto' })}
                     >
-                      Auto
+                      {t.langAuto}
                     </button>
                     <button
+                      type="button"
                       className={`provider-tab ${ui.userLanguage === 'zh' ? 'active' : ''}`}
                       onClick={() => setUiField({ userLanguage: 'zh' })}
                     >
-                      中文
+                      {t.langZh}
                     </button>
                     <button
+                      type="button"
                       className={`provider-tab ${ui.userLanguage === 'en' ? 'active' : ''}`}
                       onClick={() => setUiField({ userLanguage: 'en' })}
                     >
-                      English
+                      {t.langEn}
                     </button>
                   </div>
                   <div className="field-hint">{t.userLanguageHint}</div>
@@ -426,6 +467,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     <span className="field-hint">{t.showToolCallsByDefaultHint}</span>
                   </div>
                   <button
+                    type="button"
                     className={`toggle-switch ${ui.showToolCalls ? 'on' : ''}`}
                     onClick={() => setUiField({ showToolCalls: !ui.showToolCalls })}
                   >
@@ -442,7 +484,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   <input
                     type="text"
                     value={persona.aiName}
-                    onChange={(e) => setPersonaField('aiName', e.target.value)}
+                    onChange={(event) => setPersonaField('aiName', event.target.value)}
                     placeholder={t.aiNamePlaceholder}
                   />
                   <div className="field-hint">{t.aiNameHint}</div>
@@ -452,7 +494,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   <input
                     type="text"
                     value={persona.userName}
-                    onChange={(e) => setPersonaField('userName', e.target.value)}
+                    onChange={(event) => setPersonaField('userName', event.target.value)}
                     placeholder={t.userNamePlaceholder}
                   />
                   <div className="field-hint">{t.userNameHint}</div>
@@ -462,7 +504,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   <textarea
                     className="settings-textarea"
                     value={persona.personality}
-                    onChange={(e) => setPersonaField('personality', e.target.value)}
+                    onChange={(event) => setPersonaField('personality', event.target.value)}
                     placeholder={t.personalityPlaceholder}
                     rows={4}
                   />
@@ -475,8 +517,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
         <div className="settings-footer">
           <div className="settings-actions">
-            <button className="settings-cancel" onClick={onClose}>{t.cancel}</button>
-            <button className="settings-save" onClick={handleSave} disabled={saving}>
+            <button type="button" className="settings-cancel" onClick={onClose}>{t.cancel}</button>
+            <button type="button" className="settings-save" onClick={handleSave} disabled={saving}>
               {saved ? t.saved : saving ? t.saving : t.save}
             </button>
           </div>

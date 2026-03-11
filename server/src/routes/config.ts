@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { readFileSync, writeFileSync } from 'fs';
+import { writeFileSync } from 'fs';
 import { CONFIG_PATH, config } from '../../../config.js';
 import { probePythonTool } from '../agent/tools.js';
 
@@ -45,8 +45,7 @@ function syncRuntimeConfig(nextConfig: typeof config): void {
 
 router.get('/config', (_req, res) => {
   try {
-    const content = readFileSync(CONFIG_PATH, 'utf-8');
-    res.json(JSON.parse(content));
+    res.json(config);
   } catch {
     res.status(500).json({ error: 'Failed to read config' });
   }
@@ -54,7 +53,7 @@ router.get('/config', (_req, res) => {
 
 router.put('/config', async (req, res) => {
   try {
-    const existing = JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as Record<string, unknown>;
+    const existing = JSON.parse(JSON.stringify(config)) as Record<string, unknown>;
     const incoming = req.body as Record<string, unknown>;
     const merged = deepMergeOneLevel(existing, incoming);
 

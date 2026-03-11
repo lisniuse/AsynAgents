@@ -161,6 +161,23 @@ function buildLocalizedImageFallbackMarkup(message: string): string {
   `;
 }
 
+function upsertMarkdownImageFallback(image: HTMLImageElement, message: string): void {
+  image.style.display = 'none';
+  const existingFallback = image.nextElementSibling?.classList.contains('md-image-fallback')
+    ? image.nextElementSibling as HTMLElement
+    : null;
+
+  if (existingFallback) {
+    existingFallback.innerHTML = buildLocalizedImageFallbackMarkup(message);
+    return;
+  }
+
+  const fallback = document.createElement('div');
+  fallback.className = 'image-fallback md-image-fallback';
+  fallback.innerHTML = buildLocalizedImageFallbackMarkup(message);
+  image.insertAdjacentElement('afterend', fallback);
+}
+
 function LocalizedImageFallbackCard({
   className,
   message,
@@ -562,16 +579,16 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       image.classList.add('md-image');
       image.setAttribute('loading', 'lazy');
       const openPreview = () => setActiveImage(image.currentSrc || image.src);
-      const showFallback = () => {
-        image.style.display = 'none';
-        if (image.nextElementSibling?.classList.contains('md-image-fallback')) {
-          return;
-        }
-        const fallback = document.createElement('div');
-        fallback.className = 'image-fallback md-image-fallback';
-        fallback.innerHTML = buildLocalizedImageFallbackMarkup(t.imageLoadFailed);
-        image.insertAdjacentElement('afterend', fallback);
-      };
+      const showFallback = () => upsertMarkdownImageFallback(image, t.imageLoadFailed);
+
+      if (!image.complete) {
+        image.addEventListener('error', showFallback);
+      } else if (image.naturalWidth === 0) {
+        upsertMarkdownImageFallback(image, t.imageLoadFailed);
+      } else if (image.nextElementSibling?.classList.contains('md-image-fallback')) {
+        (image.nextElementSibling as HTMLElement).innerHTML = buildLocalizedImageFallbackMarkup(t.imageLoadFailed);
+      }
+
       image.addEventListener('click', openPreview);
       image.addEventListener('error', showFallback);
       cleanups.push(() => image.removeEventListener('click', openPreview));
@@ -581,7 +598,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     return () => {
       cleanups.forEach((cleanup) => cleanup());
     };
-  }, [message.content]);
+  }, [message.content, t.imageLoadFailed]);
 
   const lightbox = activeImage ? (
     <InteractiveImageLightbox src={activeImage} onClose={() => setActiveImage(null)} />

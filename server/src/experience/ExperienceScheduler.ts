@@ -15,7 +15,7 @@ export class ExperienceScheduler {
       return;
     }
 
-    const intervalMs = Math.max(30000, config.experience.scanIntervalMs || 60000);
+    const intervalMs = Math.max(30000, config.experience?.scanIntervalMs || 60000);
     this.timer = setInterval(() => {
       void this.runOnce();
     }, intervalMs);
@@ -49,7 +49,7 @@ export class ExperienceScheduler {
         }
 
         const state = await getConversationExperienceState(conversation.id);
-        if (!shouldAutoSummarizeConversation(conversation, state, now, config.experience.idleMinutes)) {
+        if (!shouldAutoSummarizeConversation(conversation, state, now, config.experience?.idleMinutes || 20)) {
           continue;
         }
 
