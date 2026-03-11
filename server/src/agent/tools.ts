@@ -29,6 +29,7 @@ export interface ToolExecutionResult {
 export interface ToolExecutionContext {
   rootDir?: string;
   conversationId?: string;
+  signal?: AbortSignal;
 }
 
 if (!existsSync(workspaceDir)) {
@@ -324,13 +325,26 @@ export function getOpenAITools(): OpenAI.Chat.ChatCompletionTool[] {
   }));
 }
 
-async function executeBash(command: string, timeout: number, rootDir = workspaceDir): Promise<string> {
+function isAbortError(error: unknown): boolean {
+  const candidate = error as { name?: string; code?: string; message?: string };
+  return candidate?.name === 'AbortError'
+    || candidate?.code === 'ABORT_ERR'
+    || candidate?.message === 'The operation was aborted';
+}
+
+async function executeBash(
+  command: string,
+  timeout: number,
+  rootDir = workspaceDir,
+  signal?: AbortSignal
+): Promise<string> {
   try {
     const result = await execAsync(command, {
       timeout,
       maxBuffer: 1024 * 1024 * 5,
       cwd: rootDir,
       encoding: 'buffer',
+      signal,
     });
     const stdout = decodeCommandOutput((result as unknown as { stdout: Buffer }).stdout);
     const stderr = decodeCommandOutput((result as unknown as { stderr: Buffer }).stderr);
@@ -340,6 +354,9 @@ async function executeBash(command: string, timeout: number, rootDir = workspace
     if (!output) output = '(command completed with no output)';
     return truncateOutput(output);
   } catch (err: unknown) {
+    if (isAbortError(err)) {
+      return 'Command aborted by user.';
+    }
     const error = err as { message: string; stderr?: Buffer | string; stdout?: Buffer | string };
     const firstLine = error.message.split('\n')[0];
     let output = firstLine.startsWith('Command failed')
@@ -351,7 +368,12 @@ async function executeBash(command: string, timeout: number, rootDir = workspace
   }
 }
 
-async function executePython(code: string, timeout: number, rootDir = workspaceDir): Promise<string> {
+async function executePython(
+  code: string,
+  timeout: number,
+  rootDir = workspaceDir,
+  signal?: AbortSignal
+): Promise<string> {
   const tempDir = await fs.mkdtemp(path.join(rootDir, '.python-tool-'));
   const scriptPath = path.join(tempDir, 'script.py');
 
@@ -363,6 +385,7 @@ async function executePython(code: string, timeout: number, rootDir = workspaceD
       cwd: rootDir,
       encoding: 'buffer',
       env: PYTHON_TOOL_ENV,
+      signal,
     });
     const stdout = decodeCommandOutput((result as unknown as { stdout: Buffer }).stdout);
     const stderr = decodeCommandOutput((result as unknown as { stderr: Buffer }).stderr);
@@ -372,6 +395,9 @@ async function executePython(code: string, timeout: number, rootDir = workspaceD
     if (!output) output = '(command completed with no output)';
     return truncateOutput(output);
   } catch (err: unknown) {
+    if (isAbortError(err)) {
+      return 'Command aborted by user.';
+    }
     const error = err as { message: string; stderr?: Buffer | string; stdout?: Buffer | string };
     const firstLine = error.message.split('\n')[0];
     let output = firstLine.startsWith('Command failed')
@@ -427,7 +453,8 @@ export async function executeTool(
         output: await executeBash(
           input['command'] as string,
           (input['timeout'] as number) || 30000,
-          rootDir
+          rootDir,
+          context.signal
         ),
       };
     }
@@ -437,7 +464,8 @@ export async function executeTool(
         output: await executePython(
           input['code'] as string,
           (input['timeout'] as number) || 30000,
-          rootDir
+          rootDir,
+          context.signal
         ),
       };
 

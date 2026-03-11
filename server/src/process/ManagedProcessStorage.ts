@@ -14,6 +14,7 @@ const ROOT_DIR = path.join(homedir(), '.asynagents', 'managed-processes');
 const ITEMS_DIR = path.join(ROOT_DIR, 'items');
 const LOGS_DIR = path.join(ROOT_DIR, 'logs');
 const OUTPUT_TAIL_LIMIT = 4000;
+const ANSI_ESCAPE_PATTERN = /\u001b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 
 const activeChildren = new Map<string, ChildProcess>();
 
@@ -82,11 +83,16 @@ function appendOutput(existing: string, chunk: string): string {
     : merged;
 }
 
+function stripAnsi(value: string): string {
+  return value.replace(ANSI_ESCAPE_PATTERN, '');
+}
+
 function mergeDetectedRuntime(record: ManagedProcessRecord, chunk: string): ManagedProcessRecord {
+  const cleanChunk = stripAnsi(chunk);
   const urls = new Set(record.urls);
   const ports = new Set(record.ports);
 
-  const urlMatches = chunk.match(/https?:\/\/[^\s"'`]+/g) ?? [];
+  const urlMatches = cleanChunk.match(/https?:\/\/[^\s"'`]+/g) ?? [];
   for (const match of urlMatches) {
     urls.add(match);
     try {
@@ -102,7 +108,7 @@ function mergeDetectedRuntime(record: ManagedProcessRecord, chunk: string): Mana
     }
   }
 
-  const portMatches = chunk.matchAll(/(?:localhost|127\.0\.0\.1|0\.0\.0\.0):(\d{2,5})/g);
+  const portMatches = cleanChunk.matchAll(/(?:localhost|127\.0\.0\.1|0\.0\.0\.0):(\d{2,5})/g);
   for (const match of portMatches) {
     const port = Number(match[1]);
     if (Number.isFinite(port)) {
@@ -114,7 +120,7 @@ function mergeDetectedRuntime(record: ManagedProcessRecord, chunk: string): Mana
     ...record,
     urls: Array.from(urls),
     ports: Array.from(ports).sort((a, b) => a - b),
-    recentOutput: appendOutput(record.recentOutput, chunk),
+    recentOutput: appendOutput(record.recentOutput, cleanChunk),
   };
 }
 
@@ -157,7 +163,7 @@ async function readAllRecords(): Promise<ManagedProcessRecord[]> {
 
 async function readRecentOutput(logPath: string): Promise<string> {
   try {
-    const content = await fs.readFile(logPath, 'utf8');
+    const content = stripAnsi(await fs.readFile(logPath, 'utf8'));
     return content.length > OUTPUT_TAIL_LIMIT
       ? content.slice(content.length - OUTPUT_TAIL_LIMIT)
       : content;

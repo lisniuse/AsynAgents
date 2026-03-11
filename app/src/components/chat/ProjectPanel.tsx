@@ -549,40 +549,37 @@ export const ProjectPanel: React.FC<ProjectPanelProps> = ({
     document.body.style.userSelect = 'none';
   };
 
-  const handleStopProcess = async (processId: string) => {
-    setProcessActionId(processId);
-    setProcessError(null);
-
-    try {
-      const response = await fetch(
-        `/api/conversations/${conversationId}/processes/${processId}/stop`,
-        { method: 'POST' }
-      );
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || t.processManagerStopFailed);
-      }
-      await loadProcesses(true);
-    } catch (err) {
-      setProcessError((err as Error).message);
-    } finally {
-      setProcessActionId(null);
+  const stopProcessById = async (processId: string) => {
+    const response = await fetch(
+      `/api/conversations/${conversationId}/processes/${processId}/stop`,
+      { method: 'POST' }
+    );
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || t.processManagerStopFailed);
     }
   };
 
-  const handleDeleteProcess = async (processId: string) => {
+  const deleteProcessById = async (processId: string) => {
+    const response = await fetch(
+      `/api/conversations/${conversationId}/processes/${processId}`,
+      { method: 'DELETE' }
+    );
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || t.processManagerDeleteFailed);
+    }
+  };
+
+  const handleDeleteProcess = async (processId: string, status: ManagedProcessInfo['status']) => {
     setProcessActionId(processId);
     setProcessError(null);
 
     try {
-      const response = await fetch(
-        `/api/conversations/${conversationId}/processes/${processId}`,
-        { method: 'DELETE' }
-      );
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || t.processManagerDeleteFailed);
+      if (status === 'running') {
+        await stopProcessById(processId);
       }
+      await deleteProcessById(processId);
       await loadProcesses(true);
     } catch (err) {
       setProcessError((err as Error).message);
@@ -790,10 +787,12 @@ export const ProjectPanel: React.FC<ProjectPanelProps> = ({
               <div className="process-manager-actions">
                 <button
                   type="button"
-                  className="project-panel-action"
+                  className="project-panel-icon-btn"
                   onClick={() => void loadProcesses()}
+                  aria-label={t.projectPanelRefresh}
+                  title={t.projectPanelRefresh}
                 >
-                  {t.projectPanelRefresh}
+                  <RefreshIcon size={15} />
                 </button>
                 <button
                   type="button"
@@ -838,27 +837,15 @@ export const ProjectPanel: React.FC<ProjectPanelProps> = ({
                           </div>
                         </div>
                         <div className="process-card-actions">
-                          {processInfo.status === 'running' ? (
-                            <button
-                              type="button"
-                              className="process-card-btn stop"
-                              onClick={() => void handleStopProcess(processInfo.id)}
-                              disabled={processActionId === processInfo.id}
-                            >
-                              <StopIcon size={14} />
-                              <span>{t.processManagerStop}</span>
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              className="process-card-btn delete"
-                              onClick={() => void handleDeleteProcess(processInfo.id)}
-                              disabled={processActionId === processInfo.id}
-                            >
-                              <TrashIcon size={14} />
-                              <span>{t.processManagerDelete}</span>
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            className={`process-card-btn ${processInfo.status === 'running' ? 'stop' : 'delete'}`}
+                            onClick={() => void handleDeleteProcess(processInfo.id, processInfo.status)}
+                            disabled={processActionId === processInfo.id}
+                          >
+                            {processInfo.status === 'running' ? <StopIcon size={14} /> : <TrashIcon size={14} />}
+                            <span>{t.processManagerDelete}</span>
+                          </button>
                         </div>
                       </div>
 

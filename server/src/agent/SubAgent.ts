@@ -61,10 +61,12 @@ async function createProvider(
 
 export class SubAgent {
   private stopped = false;
+  private activeToolAbortController: AbortController | null = null;
   private logger = createChildLogger('SubAgent');
 
   stop(): void {
     this.stopped = true;
+    this.activeToolAbortController?.abort();
     this.logger.info('Agent stop requested');
   }
 
@@ -160,10 +162,23 @@ export class SubAgent {
             results.push({ id: tc.id, result: output });
             continue;
           }
-          const execution = await executeTool(tc.name, tc.input, {
-            rootDir: projectPath,
-            conversationId,
-          });
+          const toolAbortController = new AbortController();
+          this.activeToolAbortController = toolAbortController;
+          let execution;
+          try {
+            execution = await executeTool(tc.name, tc.input, {
+              rootDir: projectPath,
+              conversationId,
+              signal: toolAbortController.signal,
+            });
+          } finally {
+            this.activeToolAbortController = null;
+          }
+          if (this.stopped) {
+            logger.info('Agent stopped during tool execution');
+            publish('agent_stopped', { threadId, reason: 'user_requested' });
+            return finalText;
+          }
           const output = execution.output;
           const isError = output.startsWith('Error') || output.startsWith('Command failed');
           if (execution.images && execution.images.length > 0) {
@@ -173,6 +188,7 @@ export class SubAgent {
           publish('tool_result', { id: tc.id, toolName: tc.name, result: output, isError });
           results.push({ id: tc.id, result: output });
         }
+        this.activeToolAbortController = null;
 
         provider.addToolResults(result.toolCalls, results);
         finalText = ''; // reset; real final text comes after last tool round
