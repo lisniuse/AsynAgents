@@ -34,6 +34,34 @@ export function stripThinkingTags(text: string): string {
     .trim();
 }
 
+export function extractThinkingContent(text: string): string {
+  const matches = [
+    ...text.matchAll(/<thinking>([\s\S]*?)<\/thinking>/gi),
+    ...text.matchAll(/<think>([\s\S]*?)<\/think>/gi),
+  ];
+
+  if (matches.length === 0) {
+    return stripThinkingTags(text);
+  }
+
+  return matches
+    .map((match) => match[1]?.trim() ?? '')
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+export function sanitizeAssistantOutput(text: string): string {
+  return text
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '\n')
+    .replace(/<think>[\s\S]*?<\/think>/gi, '\n')
+    .replace(/<thinking>[\s\S]*?<\//gi, '')
+    .replace(/<think>[\s\S]*?<\//gi, '')
+    .replace(/<\/?(?:thinking|think)>?/gi, '')
+    .replace(/(?:^|\n)\s*(?:thinking|think)>\s*/gi, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export class OpenAIProvider implements LLMProvider {
   private client: OpenAI;
   private model: string;
@@ -151,7 +179,12 @@ export class OpenAIProvider implements LLMProvider {
       }
     }
 
-    const cleanThinking = stripThinkingTags(thinkingText);
+    const cleanThinking = extractThinkingContent(rawText) || stripThinkingTags(thinkingText);
+    const outputText = sanitizeAssistantOutput(rawText)
+      || finalText
+      || extractFinalTextAfterThinking(rawText)
+      || sanitizeAssistantOutput(finalText)
+      || rawText.trim();
 
     const toolCalls: ToolCall[] = [];
     if (finishReason === 'tool_calls' && toolCallMap.size > 0) {
@@ -169,7 +202,7 @@ export class OpenAIProvider implements LLMProvider {
 
       this.messages.push({
         role: 'assistant',
-        content: finalText || extractFinalTextAfterThinking(rawText) || rawText || null,
+        content: outputText || null,
         tool_calls: toolCalls.map((toolCall) => ({
           id: toolCall.id,
           type: 'function' as const,
@@ -178,14 +211,13 @@ export class OpenAIProvider implements LLMProvider {
       });
 
       return {
-        text: finalText || extractFinalTextAfterThinking(rawText) || rawText,
+        text: outputText,
         stopReason: 'tool_use',
         toolCalls,
         thinking: cleanThinking,
       };
     }
 
-    const outputText = finalText || extractFinalTextAfterThinking(rawText) || rawText;
     this.messages.push({ role: 'assistant', content: outputText });
     return { text: outputText, stopReason: 'end_turn', toolCalls: [], thinking: cleanThinking };
   }

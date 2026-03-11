@@ -177,12 +177,8 @@ export const useSSE = () => {
             const doneData = event.data as { text?: string; thinking?: string };
             updateMessage(conversationId, msg.id, {
               isStreaming: false,
-              ...(doneData.text && doneData.text.length > (msg.content?.length ?? 0)
-                ? { content: doneData.text }
-                : {}),
-              ...(doneData.thinking && doneData.thinking.length > (msg.thinking?.length ?? 0)
-                ? { thinking: doneData.thinking }
-                : {}),
+              ...(typeof doneData.text === 'string' ? { content: doneData.text } : {}),
+              ...(typeof doneData.thinking === 'string' ? { thinking: doneData.thinking } : {}),
             });
           }
 
