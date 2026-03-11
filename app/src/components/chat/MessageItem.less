@@ -38,6 +38,59 @@
   border: 1px solid var(--border2);
 }
 
+.image-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 180px;
+  min-height: 180px;
+  padding: 18px;
+  border: 1px dashed var(--border2);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-2);
+  text-align: center;
+}
+
+.image-fallback-face {
+  width: 64px;
+  height: 64px;
+  display: block;
+}
+
+.image-fallback-face-bg {
+  fill: color-mix(in srgb, var(--surface-2, var(--surface)) 82%, transparent);
+  stroke: var(--border2);
+  stroke-width: 2;
+}
+
+.image-fallback-face-x {
+  fill: none;
+  stroke: #dc2626;
+  stroke-linecap: round;
+  stroke-width: 3;
+}
+
+.image-fallback-face-mouth {
+  fill: none;
+  stroke: var(--text-3);
+  stroke-linecap: round;
+  stroke-width: 2.5;
+}
+
+.image-fallback-text {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.message-image-fallback {
+  width: 240px;
+  max-width: 100%;
+  min-height: 180px;
+}
+
 .msg-assistant-images {
   display: flex;
   flex-wrap: wrap;
@@ -76,6 +129,16 @@
   user-select: none;
   will-change: transform;
   touch-action: none;
+}
+
+.image-lightbox-fallback {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  min-width: 220px;
+  min-height: 220px;
+  transform: translate(-50%, -50%);
+  background: rgba(17, 24, 39, 0.88);
 }
 
 .image-lightbox-toolbar {
@@ -439,6 +502,12 @@
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
     cursor: zoom-in;
     background: var(--surface);
+  }
+
+  .md-image-fallback {
+    max-width: min(100%, 680px);
+    min-height: 220px;
+    margin: 12px 0;
   }
 }
 

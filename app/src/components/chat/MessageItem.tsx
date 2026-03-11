@@ -93,6 +93,128 @@ function getStandaloneAssistantImages(content: string, images?: string[]): strin
   return images.filter((src) => !content.includes(src));
 }
 
+function getImageFallbackMarkup(): string {
+  return `
+    <svg class="image-fallback-face" viewBox="0 0 64 64" aria-hidden="true">
+      <circle cx="32" cy="32" r="26" class="image-fallback-face-bg"></circle>
+      <path d="M22 23l6 6M28 23l-6 6" class="image-fallback-face-x"></path>
+      <path d="M36 23l6 6M42 23l-6 6" class="image-fallback-face-x"></path>
+      <path d="M22 44c3-4 7-6 10-6s7 2 10 6" class="image-fallback-face-mouth"></path>
+    </svg>
+    <div class="image-fallback-text">图片加载失败</div>
+  `;
+}
+
+function getSvgImageFallbackMarkup(): string {
+  return `
+    <svg class="image-fallback-face" viewBox="0 0 64 64" aria-hidden="true">
+      <circle cx="32" cy="32" r="26" class="image-fallback-face-bg"></circle>
+      <path d="M22 23l6 6M28 23l-6 6" class="image-fallback-face-x"></path>
+      <path d="M36 23l6 6M42 23l-6 6" class="image-fallback-face-x"></path>
+      <path d="M22 44c3-4 7-6 10-6s7 2 10 6" class="image-fallback-face-mouth"></path>
+    </svg>
+    <div class="image-fallback-text">图片加载失败</div>
+  `;
+}
+
+function SvgImageFallbackCard({ className }: { className?: string }): React.ReactNode {
+  return (
+    <div className={className ? `image-fallback ${className}` : 'image-fallback'}>
+      <svg
+        className="image-fallback-face"
+        viewBox="0 0 64 64"
+        aria-hidden="true"
+      >
+        <circle cx="32" cy="32" r="26" className="image-fallback-face-bg" />
+        <path d="M22 23l6 6M28 23l-6 6" className="image-fallback-face-x" />
+        <path d="M36 23l6 6M42 23l-6 6" className="image-fallback-face-x" />
+        <path d="M22 44c3-4 7-6 10-6s7 2 10 6" className="image-fallback-face-mouth" />
+      </svg>
+      <div className="image-fallback-text">图片加载失败</div>
+    </div>
+  );
+}
+
+function ImageFallbackCard({ className }: { className?: string }): React.ReactNode {
+  return (
+    <div className={className ? `image-fallback ${className}` : 'image-fallback'}>
+      <div className="image-fallback-face">X X</div>
+      <div className="image-fallback-text">图片加载失败</div>
+    </div>
+  );
+}
+
+void getImageFallbackMarkup;
+void getSvgImageFallbackMarkup;
+void SvgImageFallbackCard;
+void ImageFallbackCard;
+
+function buildLocalizedImageFallbackMarkup(message: string): string {
+  return `
+    <svg class="image-fallback-face" viewBox="0 0 64 64" aria-hidden="true">
+      <circle cx="32" cy="32" r="26" class="image-fallback-face-bg"></circle>
+      <path d="M22 23l6 6M28 23l-6 6" class="image-fallback-face-x"></path>
+      <path d="M36 23l6 6M42 23l-6 6" class="image-fallback-face-x"></path>
+      <path d="M22 44c3-4 7-6 10-6s7 2 10 6" class="image-fallback-face-mouth"></path>
+    </svg>
+    <div class="image-fallback-text">${message}</div>
+  `;
+}
+
+function LocalizedImageFallbackCard({
+  className,
+  message,
+}: {
+  className?: string;
+  message: string;
+}): React.ReactNode {
+  return (
+    <div className={className ? `image-fallback ${className}` : 'image-fallback'}>
+      <svg
+        className="image-fallback-face"
+        viewBox="0 0 64 64"
+        aria-hidden="true"
+      >
+        <circle cx="32" cy="32" r="26" className="image-fallback-face-bg" />
+        <path d="M22 23l6 6M28 23l-6 6" className="image-fallback-face-x" />
+        <path d="M36 23l6 6M42 23l-6 6" className="image-fallback-face-x" />
+        <path d="M22 44c3-4 7-6 10-6s7 2 10 6" className="image-fallback-face-mouth" />
+      </svg>
+      <div className="image-fallback-text">{message}</div>
+    </div>
+  );
+}
+
+function MessageImage({
+  src,
+  onOpenImage,
+}: {
+  src: string;
+  onOpenImage: (src: string) => void;
+}): React.ReactNode {
+  const t = useT();
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return <LocalizedImageFallbackCard className="message-image-fallback" message={t.imageLoadFailed} />;
+  }
+
+  return (
+    <button
+      type="button"
+      className="message-image-button"
+      onClick={() => onOpenImage(src)}
+    >
+      <img
+        src={src}
+        alt=""
+        className="message-image"
+        onError={() => setFailed(true)}
+      />
+    </button>
+  );
+}
+
 function MessageImages({
   images,
   className,
@@ -105,14 +227,11 @@ function MessageImages({
   return (
     <div className={className}>
       {images.map((src, index) => (
-        <button
+        <MessageImage
           key={`${src}-${index}`}
-          type="button"
-          className="message-image-button"
-          onClick={() => onOpenImage(src)}
-        >
-          <img src={src} alt="" className="message-image" />
-        </button>
+          src={src}
+          onOpenImage={onOpenImage}
+        />
       ))}
     </div>
   );
@@ -125,6 +244,8 @@ function InteractiveImageLightbox({
   src: string;
   onClose: () => void;
 }): React.ReactNode {
+  const t = useT();
+  const [loadFailed, setLoadFailed] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -148,6 +269,7 @@ function InteractiveImageLightbox({
   }, [onClose]);
 
   useEffect(() => {
+    setLoadFailed(false);
     setZoom(1);
     setOffset({ x: 0, y: 0 });
     setIsDragging(false);
@@ -364,7 +486,7 @@ function InteractiveImageLightbox({
           className="image-lightbox-action image-lightbox-reset"
           onClick={showFit}
         >
-          FIT
+          {t.imageFit}
         </button>
       </div>
       <div
@@ -376,24 +498,29 @@ function InteractiveImageLightbox({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
-        <img
-          src={src}
-          alt=""
-          className="image-lightbox-image"
-          draggable={false}
-          onLoad={(event) => {
-            const image = event.currentTarget;
-            setNaturalSize({
-              width: image.naturalWidth,
-              height: image.naturalHeight,
-            });
-          }}
-          style={{
-            width: naturalSize.width ? `${naturalSize.width}px` : undefined,
-            height: naturalSize.height ? `${naturalSize.height}px` : undefined,
-            transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px)) scale(${actualScale})`,
-          }}
-        />
+        {loadFailed ? (
+          <LocalizedImageFallbackCard className="image-lightbox-fallback" message={t.imageLoadFailed} />
+        ) : (
+          <img
+            src={src}
+            alt=""
+            className="image-lightbox-image"
+            draggable={false}
+            onError={() => setLoadFailed(true)}
+            onLoad={(event) => {
+              const image = event.currentTarget;
+              setNaturalSize({
+                width: image.naturalWidth,
+                height: image.naturalHeight,
+              });
+            }}
+            style={{
+              width: naturalSize.width ? `${naturalSize.width}px` : undefined,
+              height: naturalSize.height ? `${naturalSize.height}px` : undefined,
+              transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px)) scale(${actualScale})`,
+            }}
+          />
+        )}
       </div>
     </div>,
     document.body
@@ -435,8 +562,20 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       image.classList.add('md-image');
       image.setAttribute('loading', 'lazy');
       const openPreview = () => setActiveImage(image.currentSrc || image.src);
+      const showFallback = () => {
+        image.style.display = 'none';
+        if (image.nextElementSibling?.classList.contains('md-image-fallback')) {
+          return;
+        }
+        const fallback = document.createElement('div');
+        fallback.className = 'image-fallback md-image-fallback';
+        fallback.innerHTML = buildLocalizedImageFallbackMarkup(t.imageLoadFailed);
+        image.insertAdjacentElement('afterend', fallback);
+      };
       image.addEventListener('click', openPreview);
+      image.addEventListener('error', showFallback);
       cleanups.push(() => image.removeEventListener('click', openPreview));
+      cleanups.push(() => image.removeEventListener('error', showFallback));
     });
 
     return () => {

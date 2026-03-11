@@ -11,6 +11,7 @@ import {
   FolderIcon,
 } from '@/components/icons';
 import type { ToolCallState } from '@/types';
+import { useT } from '@/i18n';
 import './ToolCard.less';
 
 const toolIconMap: Record<string, React.ReactNode> = {
@@ -77,6 +78,7 @@ function highlightLines(code: string, language: string): string[] {
 }
 
 export const ToolCard: React.FC<ToolCardProps> = ({ toolCall }) => {
+  const t = useT();
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const codePreview = useMemo(() => getCodePreview(toolCall), [toolCall]);
@@ -87,9 +89,9 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolCall }) => {
 
   const statusClass = toolCall.status;
   const statusText = {
-    running: 'Running',
-    done: 'Done',
-    error: 'Error',
+    running: t.toolStatusRunning,
+    done: t.toolStatusDone,
+    error: t.toolStatusError,
   }[toolCall.status];
 
   const handleCopyCode = async (): Promise<void> => {
@@ -123,7 +125,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolCall }) => {
           {codePreview && (
             <>
               <div className="tool-section-header">
-                <div className="tool-section-label">Code</div>
+                <div className="tool-section-label">{t.toolCode}</div>
                 <button
                   type="button"
                   className={`tool-copy-btn ${copied ? 'copied' : ''}`}
@@ -131,10 +133,10 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolCall }) => {
                     event.stopPropagation();
                     void handleCopyCode();
                   }}
-                  title={copied ? 'Copied' : 'Copy code'}
+                  title={copied ? t.toolCopied : t.toolCopyCode}
                 >
                   {copied ? <CheckIcon size={12} /> : <CopyIcon size={12} />}
-                  <span>{copied ? 'Copied' : 'Copy'}</span>
+                  <span>{copied ? t.toolCopied : t.toolCopy}</span>
                 </button>
               </div>
               <div className="tool-source-code">
@@ -151,14 +153,14 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolCall }) => {
             </>
           )}
 
-          <div className="tool-section-label">Params</div>
+          <div className="tool-section-label">{t.toolParams}</div>
           <div className="tool-code">
             {JSON.stringify(toolCall.input, null, 2)}
           </div>
 
           {toolCall.result !== undefined && (
             <>
-              <div className="tool-section-label">Result</div>
+              <div className="tool-section-label">{t.toolResult}</div>
               <div className={`tool-result-code ${toolCall.isError ? 'error' : 'success'}`}>
                 {toolCall.result}
               </div>
