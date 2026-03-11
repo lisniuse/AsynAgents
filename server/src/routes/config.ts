@@ -4,6 +4,7 @@ import { CONFIG_PATH, config } from '../../../config.js';
 import { probePythonTool } from '../agent/tools.js';
 
 const router = Router();
+const PERSONA_NAME_PATTERN = /^[A-Za-z0-9_\u3400-\u9FFF]{0,32}$/u;
 
 function deepMergeOneLevel(
   existing: Record<string, unknown>,
@@ -43,6 +44,24 @@ function syncRuntimeConfig(nextConfig: typeof config): void {
   config.persona = nextConfig.persona;
 }
 
+function validatePersonaNames(persona: unknown): string | null {
+  if (!persona || typeof persona !== 'object') {
+    return null;
+  }
+
+  const { aiName, userName } = persona as { aiName?: unknown; userName?: unknown };
+  for (const [label, value] of [['aiName', aiName], ['userName', userName]] as const) {
+    if (typeof value !== 'string') {
+      continue;
+    }
+    if (!PERSONA_NAME_PATTERN.test(value)) {
+      return `${label} must be 0-32 characters and contain only letters, numbers, underscores, or Chinese characters`;
+    }
+  }
+
+  return null;
+}
+
 router.get('/config', (_req, res) => {
   try {
     res.json(config);
@@ -56,6 +75,12 @@ router.put('/config', async (req, res) => {
     const existing = JSON.parse(JSON.stringify(config)) as Record<string, unknown>;
     const incoming = req.body as Record<string, unknown>;
     const merged = deepMergeOneLevel(existing, incoming);
+    const personaError = validatePersonaNames(merged.persona);
+
+    if (personaError) {
+      res.status(400).json({ ok: false, error: personaError });
+      return;
+    }
 
     writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2), 'utf-8');
     syncRuntimeConfig(merged as unknown as typeof config);

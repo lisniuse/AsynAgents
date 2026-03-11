@@ -127,10 +127,20 @@ interface PersonaOptions {
   personality?: string;
 }
 
+const PERSONA_NAME_ALLOWED = /[A-Za-z0-9_\u3400-\u9FFF]/gu;
+
+function sanitizePersonaName(value?: string): string {
+  if (!value) return '';
+  const matches = value.match(PERSONA_NAME_ALLOWED);
+  return (matches ?? []).join('').slice(0, 32).trim();
+}
+
 function buildPersonaSection(persona: PersonaOptions): string {
   const lines: string[] = [];
-  if (persona.aiName?.trim()) lines.push(`- Your name is **${persona.aiName.trim()}**. Use this name when introducing yourself.`);
-  if (persona.userName?.trim()) lines.push(`- Address the user as **${persona.userName.trim()}**.`);
+  const aiName = sanitizePersonaName(persona.aiName);
+  const userName = sanitizePersonaName(persona.userName);
+  if (aiName) lines.push(`- Your name is **${aiName}**. Use this name when introducing yourself.`);
+  if (userName) lines.push(`- Address the user as **${userName}**.`);
   if (persona.personality?.trim()) lines.push(`- Personality / tone: ${persona.personality.trim()}`);
   if (lines.length === 0) return '';
   return '\n\n## Persona\n' + lines.join('\n');

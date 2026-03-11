@@ -30,6 +30,7 @@ export interface AppSettings {
 
 export interface ConfigSaveResult {
   ok: boolean;
+  error?: string;
   pythonAvailable?: boolean;
   pythonPath?: string;
   pythonError?: string;
@@ -124,8 +125,10 @@ export const useAppStore = create<AppState>()(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patch),
         });
-        if (!res.ok) return null;
         const result = await res.json() as ConfigSaveResult;
+        if (!res.ok || !result.ok) {
+          return result;
+        }
         set((state) => ({
           settings: state.settings ? { ...state.settings, ...patch } : null,
         }));

@@ -25,6 +25,8 @@ type Section = 'model' | 'workspace' | 'knowledge' | 'ui' | 'persona';
 const DEFAULT_UI: UiSettings = { showToolCalls: true, language: 'zh', userLanguage: 'auto' };
 const DEFAULT_PERSONA = { aiName: '', userName: '', personality: '' };
 const DEFAULT_PYTHON = { path: 'python' };
+const PERSONA_NAME_MAX_LENGTH = 32;
+const PERSONA_NAME_ALLOWED = /[A-Za-z0-9_\u3400-\u9FFF]/gu;
 
 function sortSkills(skills: SkillItem[]): SkillItem[] {
   return [...skills].sort((a, b) => a.name.localeCompare(b.name));
@@ -32,6 +34,11 @@ function sortSkills(skills: SkillItem[]): SkillItem[] {
 
 function sortExperiences(experiences: ExperienceItem[]): ExperienceItem[] {
   return [...experiences].sort((a, b) => b.fileName.localeCompare(a.fileName));
+}
+
+function sanitizePersonaName(value: string): string {
+  const matches = value.match(PERSONA_NAME_ALLOWED);
+  return (matches ?? []).join('').slice(0, PERSONA_NAME_MAX_LENGTH);
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
@@ -49,6 +56,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const [pythonStatus, setPythonStatus] = useState<{ available: boolean; path?: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<Section>('model');
   const [togglingSkill, setTogglingSkill] = useState<string | null>(null);
   const [togglingExperience, setTogglingExperience] = useState<string | null>(null);
@@ -60,6 +68,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     copy.python = { ...DEFAULT_PYTHON, ...copy.python };
     copy.ui = { ...DEFAULT_UI, ...copy.ui };
     copy.persona = { ...DEFAULT_PERSONA, ...copy.persona };
+    copy.persona.aiName = sanitizePersonaName(copy.persona.aiName);
+    copy.persona.userName = sanitizePersonaName(copy.persona.userName);
     setForm(copy);
   }, [settings]);
 
@@ -105,7 +115,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const persona = form.persona ?? DEFAULT_PERSONA;
 
   const setPersonaField = (key: keyof typeof DEFAULT_PERSONA, value: string) => {
-    setForm({ ...form, persona: { ...persona, [key]: value } });
+    setForm({
+      ...form,
+      persona: {
+        ...persona,
+        [key]: key === 'personality' ? value : sanitizePersonaName(value),
+      },
+    });
   };
 
   const setProvider = (value: string) => setForm({ ...form, provider: value });
@@ -125,9 +141,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
   const handleSave = async () => {
     setSaving(true);
+    setSaved(false);
+    setSaveError(null);
     const result = await saveSettings(form);
     setSaving(false);
     refreshPythonStatus(result as ConfigSaveResult | null);
+    if (!result?.ok) {
+      setSaveError(result?.error ?? t.settingsSaveFailed);
+      return;
+    }
     setSaved(true);
     window.setTimeout(() => onClose(), 800);
   };
@@ -483,21 +505,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   <label>{t.aiName}</label>
                   <input
                     type="text"
+                    maxLength={PERSONA_NAME_MAX_LENGTH}
                     value={persona.aiName}
                     onChange={(event) => setPersonaField('aiName', event.target.value)}
                     placeholder={t.aiNamePlaceholder}
                   />
                   <div className="field-hint">{t.aiNameHint}</div>
+                  <div className="field-hint">{t.personaNameRule}</div>
                 </div>
                 <div className="settings-field">
                   <label>{t.userName}</label>
                   <input
                     type="text"
+                    maxLength={PERSONA_NAME_MAX_LENGTH}
                     value={persona.userName}
                     onChange={(event) => setPersonaField('userName', event.target.value)}
                     placeholder={t.userNamePlaceholder}
                   />
                   <div className="field-hint">{t.userNameHint}</div>
+                  <div className="field-hint">{t.personaNameRule}</div>
                 </div>
                 <div className="settings-field">
                   <label>{t.personality}</label>
@@ -516,6 +542,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
         </div>
 
         <div className="settings-footer">
+          {saveError && <div className="settings-error">{saveError}</div>}
           <div className="settings-actions">
             <button type="button" className="settings-cancel" onClick={onClose}>{t.cancel}</button>
             <button type="button" className="settings-save" onClick={handleSave} disabled={saving}>
