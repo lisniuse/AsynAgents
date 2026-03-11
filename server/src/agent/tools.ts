@@ -9,7 +9,7 @@ import { config, workspaceDir } from '../../../config.js';
 import { getExperienceContent } from '../experience/ExperienceStorage.js';
 import { getSkillContent } from '../skills/SkillLoader.js';
 import { isCatalogItemEnabled } from '../storage/FeatureToggleStorage.js';
-import { resolveStaticImagesDir } from '../utils/runtimePaths.js';
+import { resolveWritableImagesDir } from '../utils/runtimePaths.js';
 
 const execAsync = promisify(exec);
 const MAX_OUTPUT = 12000;
@@ -94,7 +94,7 @@ function makeImageFileName(requested?: string, extension = '.jpg'): string {
 }
 
 async function ensureUniqueImagePath(fileName: string): Promise<{ filePath: string; publicUrl: string }> {
-  const imagesDir = resolveStaticImagesDir();
+  const imagesDir = resolveWritableImagesDir();
   await fs.mkdir(imagesDir, { recursive: true });
 
   const parsed = path.parse(fileName);

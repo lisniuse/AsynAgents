@@ -24,13 +24,20 @@ export interface AppSettings {
     language?: 'zh' | 'en';
     userLanguage?: 'zh' | 'en' | 'auto';
   };
-  persona: { aiName: string; userName: string; personality: string };
+  persona: {
+    aiName: string;
+    userName: string;
+    aiAvatar: string;
+    userAvatar: string;
+    personality: string;
+  };
   maxIterations: number;
 }
 
 export interface ConfigSaveResult {
   ok: boolean;
   error?: string;
+  config?: AppSettings;
   pythonAvailable?: boolean;
   pythonPath?: string;
   pythonError?: string;
@@ -129,9 +136,9 @@ export const useAppStore = create<AppState>()(
         if (!res.ok || !result.ok) {
           return result;
         }
-        set((state) => ({
-          settings: state.settings ? { ...state.settings, ...patch } : null,
-        }));
+        set({
+          settings: result.config ?? (get().settings ? { ...get().settings!, ...patch } : null),
+        });
         return result;
       } catch (err) {
         console.error('Failed to save settings:', err);

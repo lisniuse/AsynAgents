@@ -1,7 +1,9 @@
 import { Router } from 'express';
-import { writeFileSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import { CONFIG_PATH, config } from '../../../config.js';
 import { probePythonTool } from '../agent/tools.js';
+import { resolveWritableImagesDir } from '../utils/runtimePaths.js';
 
 const router = Router();
 const PERSONA_NAME_PATTERN = /^[A-Za-z0-9_\u3400-\u9FFF]{0,32}$/u;
@@ -44,6 +46,43 @@ function syncRuntimeConfig(nextConfig: typeof config): void {
   config.persona = nextConfig.persona;
 }
 
+function guessAvatarExtension(mimeType: string): string {
+  const normalized = mimeType.toLowerCase().split(';')[0].trim();
+  if (normalized === 'image/png') return '.png';
+  if (normalized === 'image/webp') return '.webp';
+  if (normalized === 'image/gif') return '.gif';
+  if (normalized === 'image/svg+xml') return '.svg';
+  return '.jpg';
+}
+
+function savePersonaAvatar(slot: 'ai' | 'user', dataUrl: string): string {
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) {
+    throw new Error(`Invalid ${slot} avatar image data`);
+  }
+
+  const imagesDir = resolveWritableImagesDir();
+  mkdirSync(imagesDir, { recursive: true });
+  const extension = guessAvatarExtension(match[1]);
+  const fileName = `persona-${slot}-${Date.now()}${extension}`;
+  writeFileSync(join(imagesDir, fileName), Buffer.from(match[2], 'base64'));
+  return `/images/${fileName}`;
+}
+
+function normalizePersonaAvatars(persona: Record<string, unknown> | undefined): void {
+  if (!persona) {
+    return;
+  }
+
+  for (const slot of ['ai', 'user'] as const) {
+    const key = slot === 'ai' ? 'aiAvatar' : 'userAvatar';
+    const value = persona[key];
+    if (typeof value === 'string' && value.startsWith('data:image/')) {
+      persona[key] = savePersonaAvatar(slot, value);
+    }
+  }
+}
+
 function validatePersonaNames(persona: unknown): string | null {
   if (!persona || typeof persona !== 'object') {
     return null;
@@ -75,6 +114,7 @@ router.put('/config', async (req, res) => {
     const existing = JSON.parse(JSON.stringify(config)) as Record<string, unknown>;
     const incoming = req.body as Record<string, unknown>;
     const merged = deepMergeOneLevel(existing, incoming);
+    normalizePersonaAvatars(merged.persona as Record<string, unknown> | undefined);
     const personaError = validatePersonaNames(merged.persona);
 
     if (personaError) {
@@ -88,6 +128,7 @@ router.put('/config', async (req, res) => {
     const pythonProbe = await probePythonTool();
     res.json({
       ok: true,
+      config: merged,
       pythonAvailable: pythonProbe.available,
       pythonPath: config.python.path,
       pythonError: pythonProbe.error,

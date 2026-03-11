@@ -254,6 +254,22 @@ function MessageImages({
   );
 }
 
+function MessageAvatar({
+  role,
+  avatar,
+  fallback,
+}: {
+  role: 'user' | 'assistant';
+  avatar?: string;
+  fallback: React.ReactNode;
+}): React.ReactNode {
+  return (
+    <div className={`message-avatar ${role === 'user' ? 'user' : 'assistant'}`}>
+      {avatar ? <img src={avatar} alt="" className="message-avatar-image" /> : fallback}
+    </div>
+  );
+}
+
 function InteractiveImageLightbox({
   src,
   onClose,
@@ -553,6 +569,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const contentRef = useRef<HTMLDivElement>(null);
   const settings = useAppStore((state) => state.settings);
   const defaultExpanded = settings?.ui?.showToolCalls ?? true;
+  const assistantName = settings?.persona?.aiName?.trim() || t.assistant;
+  const userName = settings?.persona?.userName?.trim() || t.user;
+  const assistantAvatar = settings?.persona?.aiAvatar?.trim();
+  const userAvatar = settings?.persona?.userAvatar?.trim();
   const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
   const [activeImage, setActiveImage] = useState<string | null>(null);
   const isToolCallsExpanded = manualExpanded !== null ? manualExpanded : defaultExpanded;
@@ -607,6 +627,14 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   if (message.role === 'user') {
     return (
       <div className="message-wrapper msg-user">
+        <div className="msg-user-header">
+          <div className="msg-user-label">{userName}</div>
+          <MessageAvatar
+            role="user"
+            avatar={userAvatar}
+            fallback={<span className="message-avatar-fallback-text">{userName.slice(0, 1)}</span>}
+          />
+        </div>
         {message.images && message.images.length > 0 && (
           <MessageImages
             images={message.images}
@@ -623,10 +651,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   return (
     <div className="message-wrapper msg-assistant">
       <div className="msg-assistant-content">
-        <div className="agent-avatar">
-          <BoltIcon size={16} />
-        </div>
-        <div className="msg-label">{t.assistant}</div>
+        <MessageAvatar
+          role="assistant"
+          avatar={assistantAvatar}
+          fallback={<BoltIcon size={16} />}
+        />
+        <div className="msg-label">{assistantName}</div>
         <div className="msg-content">
           {message.toolCalls && message.toolCalls.length > 0 && (
             <div className="thinking-section">

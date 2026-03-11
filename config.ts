@@ -46,6 +46,8 @@ export interface Config {
   persona: {
     aiName: string;
     userName: string;
+    aiAvatar: string;
+    userAvatar: string;
     personality: string;
   };
   maxIterations: number; // 0 = unlimited
@@ -95,6 +97,8 @@ const defaultConfig: Config = {
   persona: {
     aiName: '',
     userName: '',
+    aiAvatar: '',
+    userAvatar: '',
     personality: '',
   },
   maxIterations: 0,

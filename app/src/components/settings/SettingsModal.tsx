@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '@/stores/appStore';
 import type { AppSettings, ConfigSaveResult } from '@/stores/appStore';
@@ -23,7 +23,7 @@ type UiSettings = NonNullable<AppSettings['ui']>;
 type Section = 'model' | 'workspace' | 'knowledge' | 'ui' | 'persona';
 
 const DEFAULT_UI: UiSettings = { showToolCalls: true, language: 'zh', userLanguage: 'auto' };
-const DEFAULT_PERSONA = { aiName: '', userName: '', personality: '' };
+const DEFAULT_PERSONA = { aiName: '', userName: '', aiAvatar: '', userAvatar: '', personality: '' };
 const DEFAULT_PYTHON = { path: 'python' };
 const PERSONA_NAME_MAX_LENGTH = 32;
 const PERSONA_NAME_ALLOWED = /[A-Za-z0-9_\u3400-\u9FFF]/gu;
@@ -61,6 +61,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const [togglingSkill, setTogglingSkill] = useState<string | null>(null);
   const [togglingExperience, setTogglingExperience] = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const aiAvatarInputRef = useRef<HTMLInputElement>(null);
+  const userAvatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!settings) return;
@@ -122,6 +124,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
         [key]: key === 'personality' ? value : sanitizePersonaName(value),
       },
     });
+  };
+
+  const handleAvatarSelected = async (
+    key: 'aiAvatar' | 'userAvatar',
+    file: File | undefined
+  ) => {
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setSaveError(t.settingsAvatarInvalid);
+      return;
+    }
+
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            resolve(reader.result);
+            return;
+          }
+          reject(new Error('Failed to read file'));
+        };
+        reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+      });
+
+      setSaveError(null);
+      setForm({
+        ...form,
+        persona: {
+          ...persona,
+          [key]: dataUrl,
+        },
+      });
+    } catch {
+      setSaveError(t.settingsAvatarReadFailed);
+    }
   };
 
   const setProvider = (value: string) => setForm({ ...form, provider: value });
@@ -501,6 +543,82 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
             {activeSection === 'persona' && (
               <div className="settings-section">
+                <div className="settings-avatar-grid">
+                  <div className="settings-field">
+                    <label>{t.aiAvatar}</label>
+                    <div className="settings-avatar-editor">
+                      <button
+                        type="button"
+                        className="settings-avatar-preview"
+                        onClick={() => aiAvatarInputRef.current?.click()}
+                        title={t.uploadAvatar}
+                      >
+                        {persona.aiAvatar ? (
+                          <img src={persona.aiAvatar} alt={t.aiAvatar} className="settings-avatar-image" />
+                        ) : (
+                          <BoltIcon size={18} />
+                        )}
+                      </button>
+                      <div className="settings-avatar-actions">
+                        <input
+                          ref={aiAvatarInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="settings-avatar-input"
+                          onChange={(event) => {
+                            void handleAvatarSelected('aiAvatar', event.target.files?.[0]);
+                            event.target.value = '';
+                          }}
+                        />
+                        <button type="button" className="provider-tab" onClick={() => aiAvatarInputRef.current?.click()}>
+                          {t.uploadAvatar}
+                        </button>
+                        <button type="button" className="provider-tab" onClick={() => setPersonaField('aiAvatar', '')}>
+                          {t.removeAvatar}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="field-hint">{t.avatarHint}</div>
+                  </div>
+
+                  <div className="settings-field">
+                    <label>{t.userAvatar}</label>
+                    <div className="settings-avatar-editor">
+                      <button
+                        type="button"
+                        className="settings-avatar-preview user"
+                        onClick={() => userAvatarInputRef.current?.click()}
+                        title={t.uploadAvatar}
+                      >
+                        {persona.userAvatar ? (
+                          <img src={persona.userAvatar} alt={t.userAvatar} className="settings-avatar-image" />
+                        ) : (
+                          <span className="settings-avatar-fallback-text">{(persona.userName || t.user).slice(0, 1)}</span>
+                        )}
+                      </button>
+                      <div className="settings-avatar-actions">
+                        <input
+                          ref={userAvatarInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="settings-avatar-input"
+                          onChange={(event) => {
+                            void handleAvatarSelected('userAvatar', event.target.files?.[0]);
+                            event.target.value = '';
+                          }}
+                        />
+                        <button type="button" className="provider-tab" onClick={() => userAvatarInputRef.current?.click()}>
+                          {t.uploadAvatar}
+                        </button>
+                        <button type="button" className="provider-tab" onClick={() => setPersonaField('userAvatar', '')}>
+                          {t.removeAvatar}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="field-hint">{t.avatarHint}</div>
+                  </div>
+                </div>
+
                 <div className="settings-field">
                   <label>{t.aiName}</label>
                   <input

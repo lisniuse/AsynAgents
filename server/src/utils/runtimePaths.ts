@@ -1,6 +1,7 @@
 import { existsSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
+import { CONFIG_DIR } from '../../../config.js';
 
 const repoRootFromEnv = process.env.ASYN_AGENTS_REPO_ROOT;
 const __filename = fileURLToPath(import.meta.url);
@@ -43,6 +44,10 @@ export function resolveSystemSkillsDir(): string {
   return join(REPO_ROOT, 'skills');
 }
 
+export function resolveWritableImagesDir(): string {
+  return join(CONFIG_DIR, 'images');
+}
+
 export function resolveStaticImagesDir(): string {
-  return join(resolveStaticDir(), 'images');
+  return resolveWritableImagesDir();
 }

@@ -11,7 +11,7 @@ import configRouter from './routes/config.js';
 import conversationsRouter from './routes/conversations.js';
 import eventsRouter from './routes/events.js';
 import { loadSkills } from './skills/SkillLoader.js';
-import { resolveStaticDir } from './utils/runtimePaths.js';
+import { resolveStaticDir, resolveWritableImagesDir } from './utils/runtimePaths.js';
 import { log } from './utils/logger.js';
 
 const app = express();
@@ -41,6 +41,15 @@ app.use((req, res, next) => {
 
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
+app.use('/images', express.static(resolveWritableImagesDir(), {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  },
+}));
 app.use(express.static(staticDir, {
   etag: false,
   lastModified: false,
