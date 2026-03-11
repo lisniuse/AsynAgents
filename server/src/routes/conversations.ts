@@ -10,6 +10,15 @@ import {
 } from '../experience/ExperienceSummarizer.js';
 import { isConversationRunning } from './chat.js';
 import type { StoredConversation } from '../types/index.js';
+import {
+  applyProjectBaseline,
+  listProjectCheckpoints,
+  initializeProjectSession,
+  listProjectCandidates,
+  listProjectTree,
+  readProjectFile,
+  restoreProjectCheckpoint,
+} from '../storage/ProjectSessionStorage.js';
 
 const router = Router();
 
@@ -19,7 +28,10 @@ router.get('/conversations', async (_req, res) => {
       storage.listConversations(),
       meta.getAllMeta(),
     ]);
-    const merged = conversations.map((c) => ({ ...c, ...metaMap[c.id] }));
+    const merged = conversations.map((conversation) => ({
+      ...conversation,
+      ...metaMap[conversation.id],
+    }));
     res.json(merged);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
@@ -46,7 +58,10 @@ router.post('/conversations', async (req, res) => {
 router.put('/conversations/:id', async (req, res) => {
   try {
     const existing = await storage.getConversation(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Not found' });
+    if (!existing) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
     const { name, messages } = req.body;
     const updated: StoredConversation = {
       ...existing,
@@ -64,7 +79,10 @@ router.put('/conversations/:id', async (req, res) => {
 router.delete('/conversations/:id', async (req, res) => {
   try {
     const success = await storage.deleteConversation(req.params.id);
-    if (!success) return res.status(404).json({ error: 'Not found' });
+    if (!success) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
     await meta.deleteMeta(req.params.id).catch(() => {});
     await deleteConversationExperienceState(req.params.id).catch(() => {});
     res.json({ success: true });
@@ -103,11 +121,94 @@ router.post('/conversations/:id/summarize', async (req, res) => {
       return;
     }
 
-    const result = await summarizeConversation(conversation, { trigger: 'manual', force: true });
+    const result = await summarizeConversation(conversation, {
+      trigger: 'manual',
+      force: true,
+    });
     res.json({
       ...result,
       message: getSummaryResultText(result),
     });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.get('/projects', async (_req, res) => {
+  try {
+    const projects = await listProjectCandidates();
+    res.json(projects);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.post('/conversations/:id/project/select', async (req, res) => {
+  try {
+    const existing = await storage.getConversation(req.params.id);
+    if (!existing) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+
+    const projectPath = String(req.body.path ?? '').trim();
+    const session = await initializeProjectSession(req.params.id, projectPath);
+    const updated: StoredConversation = {
+      ...existing,
+      projectSession: session,
+      updatedAt: Date.now(),
+    };
+    await storage.saveConversation(updated);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.get('/conversations/:id/project/tree', async (req, res) => {
+  try {
+    const tree = await listProjectTree(req.params.id);
+    res.json(tree);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.get('/conversations/:id/project/file', async (req, res) => {
+  try {
+    const relativePath = String(req.query.path ?? '');
+    const file = await readProjectFile(req.params.id, relativePath);
+    res.json(file);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.get('/conversations/:id/project/checkpoints', async (req, res) => {
+  try {
+    const checkpoints = await listProjectCheckpoints(req.params.id);
+    res.json(checkpoints);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.post('/conversations/:id/project/checkpoints/:checkpointId/restore', async (req, res) => {
+  try {
+    const checkpoint = await restoreProjectCheckpoint(
+      req.params.id,
+      req.params.checkpointId
+    );
+    res.json({ ok: true, checkpoint });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.post('/conversations/:id/project/apply', async (req, res) => {
+  try {
+    await applyProjectBaseline(req.params.id);
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }

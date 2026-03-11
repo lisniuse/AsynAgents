@@ -127,6 +127,10 @@ interface PersonaOptions {
   personality?: string;
 }
 
+interface ProjectModeOptions {
+  projectPath?: string;
+}
+
 const PERSONA_NAME_ALLOWED = /[A-Za-z0-9_\u3400-\u9FFF]/gu;
 
 function sanitizePersonaName(value?: string): string {
@@ -146,12 +150,32 @@ function buildPersonaSection(persona: PersonaOptions): string {
   return '\n\n## Persona\n' + lines.join('\n');
 }
 
+function buildProjectModeSection(projectMode?: ProjectModeOptions): string {
+  const projectPath = projectMode?.projectPath?.trim();
+  if (!projectPath) {
+    return '';
+  }
+
+  return `\n\n## Project Mode
+- You are operating in an AI IDE style project session.
+- The active project root is: ${projectPath}
+- Treat this project root as your default working directory for code, file reads, file writes, and shell commands.
+- Prefer inspecting the project structure before making changes.
+- When you make code changes, keep them cohesive and oriented toward buildable results.`;
+}
+
 /** Build the full system prompt, optionally appending skills and user language preference. */
-export function buildSystemPrompt(skillsSection?: string, userLanguage?: string, persona?: PersonaOptions): string {
+export function buildSystemPrompt(
+  skillsSection?: string,
+  userLanguage?: string,
+  persona?: PersonaOptions,
+  projectMode?: ProjectModeOptions
+): string {
   const basePrompt = buildBaseSystemPrompt();
   const langSection = userLanguage ? buildUserLanguageSection(userLanguage) : '';
   const personaSection = persona ? buildPersonaSection(persona) : '';
-  return basePrompt + personaSection + langSection + (skillsSection ?? '');
+  const projectModeSection = buildProjectModeSection(projectMode);
+  return basePrompt + personaSection + projectModeSection + langSection + (skillsSection ?? '');
 }
 
 /** @deprecated Use buildSystemPrompt() instead */

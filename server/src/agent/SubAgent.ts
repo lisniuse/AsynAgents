@@ -23,12 +23,18 @@ function toLogMeta(data: unknown): Record<string, unknown> | undefined {
 // 0 means unlimited; fall back to 100 as a safety cap when unlimited
 const MAX_ITERATIONS = config.maxIterations > 0 ? config.maxIterations : 100;
 
-async function createProvider(history: SimpleMsg[], userMessage: string, images?: string[]): Promise<LLMProvider> {
+async function createProvider(
+  history: SimpleMsg[],
+  userMessage: string,
+  images?: string[],
+  projectPath?: string
+): Promise<LLMProvider> {
   const [skills, experiences] = await Promise.all([loadSkills(), loadExperiences()]);
   const systemPrompt = buildSystemPrompt(
     `${buildSkillsPrompt(skills)}${buildExperiencePrompt(experiences)}`,
     config.ui?.userLanguage ?? 'auto',
-    config.persona
+    config.persona,
+    { projectPath }
   );
 
   if (config.provider === 'openai') {
@@ -71,7 +77,8 @@ export class SubAgent {
     conversationId: string,
     conversationHistory: SimpleMsg[],
     userMessage: string,
-    images?: string[]
+    images?: string[],
+    projectPath?: string
   ): Promise<string> {
     this.stopped = false;
     const logger = createChildLogger(`Thread-${threadId.slice(0, 8)}`);
@@ -86,7 +93,7 @@ export class SubAgent {
 
     publish('agent_start', { threadId });
 
-    const provider = await createProvider(conversationHistory, userMessage, images);
+    const provider = await createProvider(conversationHistory, userMessage, images, projectPath);
     let finalText = '';
     let thinkingText = '';
     let finalImages: string[] = [];
@@ -153,7 +160,9 @@ export class SubAgent {
             results.push({ id: tc.id, result: output });
             continue;
           }
-          const execution = await executeTool(tc.name, tc.input);
+          const execution = await executeTool(tc.name, tc.input, {
+            rootDir: projectPath,
+          });
           const output = execution.output;
           const isError = output.startsWith('Error') || output.startsWith('Command failed');
           if (execution.images && execution.images.length > 0) {

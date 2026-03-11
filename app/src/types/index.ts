@@ -72,6 +72,12 @@ export interface Conversation {
   messages: Message[];
   pinned?: boolean;
   bold?: boolean;
+  projectSession?: {
+    mode: 'project';
+    projectPath: string;
+    projectName: string;
+    selectedAt: number;
+  } | null;
 }
 
 export interface AgentState {

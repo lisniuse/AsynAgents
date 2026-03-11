@@ -2,6 +2,7 @@
 
 :root,
 [data-theme="dark"] {
+  --font-mono: "Cascadia Code", "JetBrains Mono", "Fira Code", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
   --bg:          #0f0f0f;
   --sidebar-bg:  #161616;
   --surface:     #1e1e1e;
@@ -101,6 +102,13 @@ a {
 
 button {
   font-family: inherit;
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-mono);
 }
 
 .hljs-keyword,

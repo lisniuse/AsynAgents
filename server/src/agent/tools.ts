@@ -25,13 +25,17 @@ export interface ToolExecutionResult {
   images?: string[];
 }
 
+export interface ToolExecutionContext {
+  rootDir?: string;
+}
+
 if (!existsSync(workspaceDir)) {
   mkdirSync(workspaceDir, { recursive: true });
 }
 
-function resolveWorkspacePath(inputPath: string): string {
+function resolveWorkspacePath(inputPath: string, rootDir = workspaceDir): string {
   if (path.isAbsolute(inputPath)) return inputPath;
-  return path.resolve(workspaceDir, inputPath);
+  return path.resolve(rootDir, inputPath);
 }
 
 function decodeCommandOutput(buf: Buffer | string): string {
@@ -316,12 +320,12 @@ export function getOpenAITools(): OpenAI.Chat.ChatCompletionTool[] {
   }));
 }
 
-async function executeBash(command: string, timeout: number): Promise<string> {
+async function executeBash(command: string, timeout: number, rootDir = workspaceDir): Promise<string> {
   try {
     const result = await execAsync(command, {
       timeout,
       maxBuffer: 1024 * 1024 * 5,
-      cwd: workspaceDir,
+      cwd: rootDir,
       encoding: 'buffer',
     });
     const stdout = decodeCommandOutput((result as unknown as { stdout: Buffer }).stdout);
@@ -343,8 +347,8 @@ async function executeBash(command: string, timeout: number): Promise<string> {
   }
 }
 
-async function executePython(code: string, timeout: number): Promise<string> {
-  const tempDir = await fs.mkdtemp(path.join(workspaceDir, '.python-tool-'));
+async function executePython(code: string, timeout: number, rootDir = workspaceDir): Promise<string> {
+  const tempDir = await fs.mkdtemp(path.join(rootDir, '.python-tool-'));
   const scriptPath = path.join(tempDir, 'script.py');
 
   try {
@@ -352,7 +356,7 @@ async function executePython(code: string, timeout: number): Promise<string> {
     const result = await execAsync(buildPythonScriptCommand(scriptPath), {
       timeout,
       maxBuffer: 1024 * 1024 * 5,
-      cwd: workspaceDir,
+      cwd: rootDir,
       encoding: 'buffer',
       env: PYTHON_TOOL_ENV,
     });
@@ -379,14 +383,17 @@ async function executePython(code: string, timeout: number): Promise<string> {
 
 export async function executeTool(
   name: string,
-  input: Record<string, unknown>
+  input: Record<string, unknown>,
+  context: ToolExecutionContext = {}
 ): Promise<ToolExecutionResult> {
+  const rootDir = context.rootDir || workspaceDir;
   switch (name) {
     case 'bash':
       return {
         output: await executeBash(
           input['command'] as string,
-          (input['timeout'] as number) || 30000
+          (input['timeout'] as number) || 30000,
+          rootDir
         ),
       };
 
@@ -394,7 +401,8 @@ export async function executeTool(
       return {
         output: await executePython(
           input['code'] as string,
-          (input['timeout'] as number) || 30000
+          (input['timeout'] as number) || 30000,
+          rootDir
         ),
       };
 
@@ -414,7 +422,7 @@ export async function executeTool(
     }
 
     case 'write_file': {
-      const filePath = resolveWorkspacePath(input['path'] as string);
+      const filePath = resolveWorkspacePath(input['path'] as string, rootDir);
       const content = input['content'] as string;
       try {
         await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -426,7 +434,7 @@ export async function executeTool(
     }
 
     case 'read_file': {
-      const filePath = resolveWorkspacePath(input['path'] as string);
+      const filePath = resolveWorkspacePath(input['path'] as string, rootDir);
       try {
         const content = await fs.readFile(filePath, 'utf8');
         return {
@@ -440,7 +448,7 @@ export async function executeTool(
     }
 
     case 'list_directory': {
-      const dirPath = resolveWorkspacePath((input['path'] as string) || workspaceDir);
+      const dirPath = resolveWorkspacePath((input['path'] as string) || rootDir, rootDir);
       try {
         const entries = await fs.readdir(dirPath, { withFileTypes: true });
         if (entries.length === 0) return { output: '(empty directory)' };

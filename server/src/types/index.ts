@@ -54,6 +54,13 @@ export interface StoredToolCall {
   status: 'done' | 'error';
 }
 
+export interface ProjectSessionSummary {
+  mode: 'project';
+  projectPath: string;
+  projectName: string;
+  selectedAt: number;
+}
+
 export interface StoredMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -74,4 +81,5 @@ export interface StoredConversation {
   messages: StoredMessage[];
   pinned?: boolean;
   bold?: boolean;
+  projectSession?: ProjectSessionSummary | null;
 }

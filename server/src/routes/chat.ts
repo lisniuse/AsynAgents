@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { SubAgent } from '../agent/SubAgent.js';
 import { validateConfig } from '../../../config.js';
 import type { ChatRequest, ChatResponse } from '../types/index.js';
+import { getConversation } from '../storage/ConversationStorage.js';
+import { createProjectCheckpoint } from '../storage/ProjectSessionStorage.js';
 
 const router = Router();
 const runningAgents = new Map<string, SubAgent>();
@@ -51,17 +53,32 @@ router.post('/chat', async (req, res) => {
   const agent = new SubAgent();
   runningAgents.set(threadId, agent);
   trackConversationThread(conversationId, threadId);
+  const conversation = await getConversation(conversationId);
+  const projectPath = conversation?.projectSession?.projectPath;
+
+  const finalizeThread = async (captureCheckpoint: boolean) => {
+    if (captureCheckpoint && projectPath) {
+      await createProjectCheckpoint(conversationId, threadId).catch(() => {});
+    }
+    runningAgents.delete(threadId);
+    untrackConversationThread(conversationId, threadId);
+  };
 
   agent
-    .run(threadId, conversationId, conversationHistory || [], message, images)
-    .then(() => {
-      runningAgents.delete(threadId);
-      untrackConversationThread(conversationId, threadId);
+    .run(
+      threadId,
+      conversationId,
+      conversationHistory || [],
+      message,
+      images,
+      projectPath
+    )
+    .then(async () => {
+      await finalizeThread(true);
     })
-    .catch((err: Error) => {
+    .catch(async (err: Error) => {
       console.error(`[Thread ${threadId}] Agent error:`, err.message);
-      runningAgents.delete(threadId);
-      untrackConversationThread(conversationId, threadId);
+      await finalizeThread(Boolean(projectPath));
     });
 });
 
