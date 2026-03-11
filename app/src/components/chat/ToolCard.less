@@ -38,27 +38,38 @@
   display: flex;
   align-items: center;
   gap: 5px;
+  padding: 4px 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
 
   &.running {
-    color: var(--accent);
+    color: #b45309;
+    background: rgba(245, 158, 11, 0.14);
+    border-color: rgba(245, 158, 11, 0.22);
   }
 
   &.done {
-    color: var(--green);
+    color: #166534;
+    background: rgba(34, 197, 94, 0.14);
+    border-color: rgba(34, 197, 94, 0.22);
   }
 
   &.error {
-    color: var(--red);
+    color: #b42318;
+    background: rgba(239, 68, 68, 0.14);
+    border-color: rgba(239, 68, 68, 0.22);
   }
 }
 
 .spinner {
   width: 12px;
   height: 12px;
-  border: 2px solid rgba(217, 119, 6, 0.3);
-  border-top-color: var(--accent);
+  border: 2px solid rgba(180, 83, 9, 0.18);
+  border-top-color: currentColor;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
@@ -204,6 +215,26 @@
 
   &.error {
     color: #b91c1c;
+  }
+}
+
+[data-theme="light"] .tool-status {
+  &.running {
+    color: #9a5b00;
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.18);
+  }
+
+  &.done {
+    color: #166534;
+    background: rgba(34, 197, 94, 0.11);
+    border-color: rgba(34, 197, 94, 0.18);
+  }
+
+  &.error {
+    color: #b42318;
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.16);
   }
 }
 
