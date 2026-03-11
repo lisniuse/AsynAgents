@@ -1,10 +1,38 @@
 import OpenAI from 'openai';
-import type { LLMProvider, TurnResult, ToolCall, EmitFn } from './base.js';
-import { buildSystemPrompt } from './base.js';
-import { getOpenAITools } from '../tools.js';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions.js';
+import { getOpenAITools } from '../tools.js';
+import { buildSystemPrompt } from './base.js';
+import type { EmitFn, LLMProvider, ToolCall, TurnResult } from './base.js';
 
 type SimpleMsg = { role: 'user' | 'assistant'; content: string };
+
+const THINK_CLOSE_TAGS = ['</thinking>', '</think>'] as const;
+
+function findLastThinkingCloseTag(text: string): { index: number; tag: string } | null {
+  let lastMatch: { index: number; tag: string } | null = null;
+
+  for (const tag of THINK_CLOSE_TAGS) {
+    const index = text.lastIndexOf(tag);
+    if (index !== -1 && (!lastMatch || index > lastMatch.index)) {
+      lastMatch = { index, tag };
+    }
+  }
+
+  return lastMatch;
+}
+
+export function extractFinalTextAfterThinking(text: string): string {
+  const match = findLastThinkingCloseTag(text);
+  if (!match) return '';
+  return text.slice(match.index + match.tag.length).trim();
+}
+
+export function stripThinkingTags(text: string): string {
+  return text
+    .replace(/<\/?think>/g, '')
+    .replace(/<\/?thinking>/g, '')
+    .trim();
+}
 
 export class OpenAIProvider implements LLMProvider {
   private client: OpenAI;
@@ -16,26 +44,32 @@ export class OpenAIProvider implements LLMProvider {
     model: string,
     baseUrl: string,
     history: SimpleMsg[] = [],
-    userMessage: string = '',
+    userMessage = '',
     systemPrompt?: string,
     images?: string[]
   ) {
     this.client = new OpenAI({ apiKey, baseURL: baseUrl });
     this.model = model;
 
-    type OAIUserContent = string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>;
+    type OAIUserContent =
+      | string
+      | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>;
+
     let userContent: OAIUserContent = userMessage;
     if (images && images.length > 0) {
-      const parts: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = images.map(
-        (url) => ({ type: 'image_url', image_url: { url } })
-      );
+      const parts: Array<
+        { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
+      > = images.map((url) => ({ type: 'image_url', image_url: { url } }));
       if (userMessage) parts.push({ type: 'text', text: userMessage });
       userContent = parts;
     }
 
     this.messages = [
       { role: 'system', content: systemPrompt ?? buildSystemPrompt() },
-      ...history.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      ...history.map((message) => ({
+        role: message.role as 'user' | 'assistant',
+        content: message.content,
+      })),
       ...(userMessage || (images && images.length > 0)
         ? [{ role: 'user' as const, content: userContent }]
         : []),
@@ -43,7 +77,6 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   async doTurn(emit: EmitFn): Promise<TurnResult> {
-    // Accumulate tool calls across stream chunks (keyed by index)
     const toolCallMap = new Map<number, { id: string; name: string; args: string }>();
     let rawText = '';
     let finalText = '';
@@ -68,120 +101,101 @@ export class OpenAIProvider implements LLMProvider {
         const content = delta.content;
         rawText += content;
 
-        // 检测思考过程标记
-        // 支持多种思考标记格式: <think>...</think>, <thinking>...</thinking>, 或 reasoning_content 字段
         if (content.includes('<think>') || content.includes('<thinking>')) {
           inThinkingMode = true;
         }
 
         if (inThinkingMode) {
-          // 在思考模式中
           thinkingText += content;
           emit('thinking_delta', { text: content });
 
-          // 检查是否结束思考
           if (content.includes('</think>') || content.includes('</thinking>')) {
             inThinkingMode = false;
           }
+        } else if (thinkingText && !content.includes('<') && !content.includes('>')) {
+          finalText += content;
+          emit('text_delta', { text: content });
         } else {
-          // 不在思考模式中，这是最终输出
-          // 但如果包含思考标记，需要提取最终内容
-          if (thinkingText && !content.includes('<') && !content.includes('>')) {
-            // 已经有思考内容，当前内容是最终输出
-            finalText += content;
-            emit('text_delta', { text: content });
-          } else {
-            // 可能是思考内容的一部分，先存起来
-            const thinkEndIndex = Math.max(
-              rawText.lastIndexOf('</think>'),
-              rawText.lastIndexOf('</thinking>')
-            );
-            if (thinkEndIndex !== -1) {
-              // 提取 </think> 之后的内容作为最终输出
-              const afterThink = rawText.slice(thinkEndIndex);
-              const cleanContent = afterThink
-                .replace(/<\/?think>/g, '')
-                .replace(/<\/?thinking>/g, '')
-                .trim();
-              if (cleanContent && !finalText.includes(cleanContent)) {
-                finalText = cleanContent;
-                emit('text_delta', { text: content });
-              }
-            } else {
-              // 还没有看到思考结束标记，可能是思考内容
-              thinkingText += content;
-              emit('thinking_delta', { text: content });
+          const extractedText = extractFinalTextAfterThinking(rawText);
+          if (extractedText) {
+            if (!finalText.includes(extractedText)) {
+              finalText = extractedText;
+              emit('text_delta', { text: content });
             }
+          } else {
+            thinkingText += content;
+            emit('thinking_delta', { text: content });
           }
         }
       }
 
       if (delta?.tool_calls) {
-        for (const tc of delta.tool_calls) {
-          const idx = tc.index;
-          if (!toolCallMap.has(idx)) {
-            toolCallMap.set(idx, { id: '', name: '', args: '' });
+        for (const toolCall of delta.tool_calls) {
+          const index = toolCall.index;
+          if (!toolCallMap.has(index)) {
+            toolCallMap.set(index, { id: '', name: '', args: '' });
           }
-          const acc = toolCallMap.get(idx)!;
-          if (tc.id) acc.id = tc.id;
-          if (tc.function?.name) acc.name = tc.function.name;
-          if (tc.function?.arguments) acc.args += tc.function.arguments;
+          const acc = toolCallMap.get(index)!;
+          if (toolCall.id) acc.id = toolCall.id;
+          if (toolCall.function?.name) acc.name = toolCall.function.name;
+          if (toolCall.function?.arguments) acc.args += toolCall.function.arguments;
         }
       }
     }
 
-    // 流结束后，如果最终文本为空但有思考内容，尝试提取
     if (!finalText && thinkingText) {
-      const thinkEndIndex = Math.max(
-        thinkingText.lastIndexOf('</think>'),
-        thinkingText.lastIndexOf('</thinking>')
-      );
-      if (thinkEndIndex !== -1) {
-        finalText = thinkingText.slice(thinkEndIndex + 8).trim(); // 8 is length of </think>
-        thinkingText = thinkingText.slice(0, thinkEndIndex + 8);
+      const match = findLastThinkingCloseTag(thinkingText);
+      if (match) {
+        finalText = thinkingText.slice(match.index + match.tag.length).trim();
+        thinkingText = thinkingText.slice(0, match.index + match.tag.length);
       }
     }
 
-    // 清理思考内容中的标记
-    const cleanThinking = thinkingText
-      .replace(/<\/?think>/g, '')
-      .replace(/<\/?thinking>/g, '')
-      .trim();
+    const cleanThinking = stripThinkingTags(thinkingText);
 
     const toolCalls: ToolCall[] = [];
     if (finishReason === 'tool_calls' && toolCallMap.size > 0) {
-      for (const [, tc] of [...toolCallMap.entries()].sort(([a], [b]) => a - b)) {
+      for (const [, toolCall] of [...toolCallMap.entries()].sort(([a], [b]) => a - b)) {
         let input: Record<string, unknown> = {};
-        try { input = JSON.parse(tc.args || '{}'); } catch { input = { _raw: tc.args }; }
-        toolCalls.push({ id: tc.id, name: tc.name, input });
-        emit('tool_call', { id: tc.id, name: tc.name, input });
+        try {
+          input = JSON.parse(toolCall.args || '{}');
+        } catch {
+          input = { _raw: toolCall.args };
+        }
+
+        toolCalls.push({ id: toolCall.id, name: toolCall.name, input });
+        emit('tool_call', { id: toolCall.id, name: toolCall.name, input });
       }
 
-      // Add assistant message with tool_calls to history
       this.messages.push({
         role: 'assistant',
-        content: finalText || rawText || null,
-        tool_calls: toolCalls.map((tc) => ({
-          id: tc.id,
+        content: finalText || extractFinalTextAfterThinking(rawText) || rawText || null,
+        tool_calls: toolCalls.map((toolCall) => ({
+          id: toolCall.id,
           type: 'function' as const,
-          function: { name: tc.name, arguments: JSON.stringify(tc.input) },
+          function: { name: toolCall.name, arguments: JSON.stringify(toolCall.input) },
         })),
       });
 
-      return { text: finalText || rawText, stopReason: 'tool_use', toolCalls, thinking: cleanThinking };
+      return {
+        text: finalText || extractFinalTextAfterThinking(rawText) || rawText,
+        stopReason: 'tool_use',
+        toolCalls,
+        thinking: cleanThinking,
+      };
     }
 
-    // Normal end
-    this.messages.push({ role: 'assistant', content: finalText || rawText });
-    return { text: finalText || rawText, stopReason: 'end_turn', toolCalls: [], thinking: cleanThinking };
+    const outputText = finalText || extractFinalTextAfterThinking(rawText) || rawText;
+    this.messages.push({ role: 'assistant', content: outputText });
+    return { text: outputText, stopReason: 'end_turn', toolCalls: [], thinking: cleanThinking };
   }
 
   addToolResults(_toolCalls: ToolCall[], results: Array<{ id: string; result: string }>): void {
-    for (const r of results) {
+    for (const result of results) {
       this.messages.push({
         role: 'tool',
-        tool_call_id: r.id,
-        content: r.result,
+        tool_call_id: result.id,
+        content: result.result,
       });
     }
   }
