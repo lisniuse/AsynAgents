@@ -30,6 +30,53 @@ function parseFrontMatter(raw: string): { meta: Record<string, string>; body: st
   return { meta, body: match[2] };
 }
 
+function normalizeLookupKey(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function buildSkillAliases(skill: Skill): Set<string> {
+  const aliases = new Set<string>();
+  const dirName = path.basename(skill.dir);
+  const push = (value?: string) => {
+    if (!value) return;
+    aliases.add(normalizeLookupKey(value));
+  };
+
+  push(skill.name);
+  push(dirName);
+
+  if (!skill.name.endsWith('-skill')) {
+    push(`${skill.name}-skill`);
+  }
+
+  if (dirName.endsWith('-skill')) {
+    push(dirName.slice(0, -6));
+  }
+
+  return aliases;
+}
+
+export function matchSkill(skills: Skill[], requestedName: string): Skill | null {
+  const lookup = normalizeLookupKey(requestedName);
+  for (const skill of skills) {
+    if (buildSkillAliases(skill).has(lookup)) {
+      return skill;
+    }
+  }
+  return null;
+}
+
+export function renderSkillContent(skill: Skill): string {
+  const renderedBody = skill.content.replaceAll('{{SKILL_DIR}}', skill.dir);
+  return (
+    `## Skill Context\n` +
+    `- Skill name: ${skill.name}\n` +
+    `- Skill directory: ${skill.dir}\n` +
+    `- Resolve any relative paths from this directory.\n\n` +
+    renderedBody
+  );
+}
+
 /** Load all skills from a directory (each subdirectory = one skill). */
 function loadSkillsFromDir(dir: string, source: 'system' | 'user'): Skill[] {
   if (!fs.existsSync(dir)) return [];
@@ -109,8 +156,8 @@ export async function listSkills(): Promise<Skill[]> {
 /** Get full content of a skill by name. Returns null if not found. */
 export async function getSkillContent(name: string): Promise<string | null> {
   const skills = await loadSkills();
-  const skill = skills.find((entry) => entry.name === name);
-  return skill ? skill.content : null;
+  const skill = matchSkill(skills, name);
+  return skill ? renderSkillContent(skill) : null;
 }
 
 /**

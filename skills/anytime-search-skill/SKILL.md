@@ -10,7 +10,7 @@ Stealth browser search and web crawling tool using Playwright. Supports 18+ sear
 ## Setup (one-time)
 
 ```bash
-cd D:/dev/github/anytime-search-skill
+cd "{{SKILL_DIR}}"
 pip install -r requirements.txt
 playwright install chromium
 ```
@@ -18,7 +18,7 @@ playwright install chromium
 ## Search
 
 ```bash
-python D:/dev/github/anytime-search-skill/search.py -q "<query>" [options]
+python "{{SKILL_DIR}}/search.py" -q "<query>" [options]
 ```
 
 ### Key options
@@ -37,32 +37,32 @@ python D:/dev/github/anytime-search-skill/search.py -q "<query>" [options]
 
 ```bash
 # Default Google search
-python D:/dev/github/anytime-search-skill/search.py -q "Python asyncio tutorial"
+python "{{SKILL_DIR}}/search.py" -q "Python asyncio tutorial"
 
 # Use Bing, return 5 results as JSON
-python D:/dev/github/anytime-search-skill/search.py -q "latest news" -e bing -n 5 --json
+python "{{SKILL_DIR}}/search.py" -q "latest news" -e bing -n 5 --json
 
 # Search Baidu (Chinese)
-python D:/dev/github/anytime-search-skill/search.py -q "Python 异步编程" -e baidu
+python "{{SKILL_DIR}}/search.py" -q "Python 异步编程" -e baidu
 
 # Deep search: get full page content for each result
-python D:/dev/github/anytime-search-skill/search.py -q "openai api docs" --deep
+python "{{SKILL_DIR}}/search.py" -q "openai api docs" --deep
 ```
 
 ## Crawl a URL
 
 ```bash
-python D:/dev/github/anytime-search-skill/search.py -u <URL> [--wait-for "<CSS_SELECTOR>"]
+python "{{SKILL_DIR}}/search.py" -u <URL> [--wait-for "<CSS_SELECTOR>"]
 ```
 
 Returns cleaned HTML body (scripts, styles, images removed). Use `--wait-for` for SPAs.
 
 ```bash
 # Crawl a page
-python D:/dev/github/anytime-search-skill/search.py -u https://example.com
+python "{{SKILL_DIR}}/search.py" -u https://example.com
 
 # Wait for dynamic content to load
-python D:/dev/github/anytime-search-skill/search.py -u https://spa-site.com --wait-for ".main-content"
+python "{{SKILL_DIR}}/search.py" -u https://spa-site.com --wait-for ".main-content"
 ```
 
 ## Supported engines
@@ -74,7 +74,7 @@ python D:/dev/github/anytime-search-skill/search.py -u https://spa-site.com --wa
 **Russia:** `mail`
 **Shortcuts:** `g`=google, `b`=bing, `ddg`=duckduckgo
 
-Run `python D:/dev/github/anytime-search-skill/search.py --list-engines` for the full list.
+Run `python "{{SKILL_DIR}}/search.py" --list-engines` for the full list.
 
 ## Output format
 
