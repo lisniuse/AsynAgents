@@ -7,7 +7,7 @@
 **An agent-first desktop web app where every user message becomes its own runnable agent thread.**
 
 Not a thin chat wrapper. Not a toy prompt box.  
-AsynAgents is built for long-running, tool-using, file-editing agent work with real-time streaming, persistent local memory, reusable skills, and now reusable experience notes.
+AsynAgents is built for real agent work: long-running tasks, tool calls, file edits, local persistence, reusable skills, reusable experience notes, and standalone release builds.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org)
@@ -17,65 +17,59 @@ AsynAgents is built for long-running, tool-using, file-editing agent work with r
 
 </div>
 
-## Why It Stands Out
+## Why It Feels Different
 
 Most AI apps treat a conversation as one fuzzy session.
 
-AsynAgents treats **each message as an independent agent run**:
-- A new message creates a dedicated backend `SubAgent`
-- The agent can think, call tools, read and write files, and stream progress live
-- The UI can reconnect and replay buffered SSE events instead of losing the run state
-- Conversation history is persisted locally as real files, not hidden in a browser-only cache
+AsynAgents treats **every message as a separate agent run**:
+- a new backend `SubAgent` starts for each user message
+- the run can think, call tools, stream progress, stop cleanly, and persist its result
+- the frontend can reconnect and replay buffered SSE events
+- chat history is stored as local files under `~/.asynagents/`
 
-That architecture gives this project a very different feel from normal chatbot UIs:
-- Better control over long-running jobs
-- Cleaner stop / resume / replay behavior
-- Easier debugging of agent execution
-- A natural place to accumulate reusable skills and reusable experiences
+That architecture makes the app much better suited for real execution-heavy work than a normal chatbot shell.
 
-## What Is Unique Here
+## What Stands Out
 
 ### 1. One Message, One Agent Thread
 
-Every `POST /api/chat` request starts a fresh `SubAgent` run.  
-This keeps each task isolated and makes tool execution, stopping, logging, and replay much easier to reason about.
+Every `POST /api/chat` starts a fresh `SubAgent` run.  
+That keeps tool execution, logging, stop control, and event replay isolated and understandable.
 
 ### 2. Real-Time Streaming With Replay
 
-The backend uses SSE plus an in-memory event buffer:
-- token streaming
-- thinking streaming
-- tool call streaming
-- tool result streaming
-- late reconnect replay
+The backend streams:
+- text deltas
+- thinking deltas
+- tool call state
+- tool results
+- completion and error events
 
-If the frontend reconnects, it can rebuild the current message from buffered events instead of pretending nothing happened.
+If the UI reconnects, it can rebuild the current run from buffered events instead of losing context.
 
-### 3. Local-First Agent Memory
+### 3. Local-First Runtime
 
-AsynAgents stores real data under `~/.asynagents/`:
-- `conversations/` for chat history
-- `skills/` for user-installed skills
-- `experiences/` for distilled lessons from old conversations
-- `workspace/` for agent file operations
-- `logs/` for structured runtime logs
+AsynAgents stores inspectable data under `~/.asynagents/`:
+- `conversations/`
+- `skills/`
+- `experiences/`
+- `workspace/`
+- `logs/`
 
-This makes the app inspectable, scriptable, and hackable.
+Nothing important is trapped inside browser-only storage.
 
-### 4. Skills and Experiences Are Separate
+### 4. Skills and Experiences Are Different Layers
 
-Most projects stop at prompt templates.
-
-AsynAgents has two different reusable knowledge layers:
+AsynAgents has two reusable knowledge systems:
 - **Skills**: explicit instruction packs loaded from `SKILL.md`
-- **Experiences**: lessons automatically or manually summarized from previous conversations
+- **Experiences**: distilled lessons summarized from past conversations
 
-Skills teach the agent how to do something.  
-Experiences help the agent avoid re-learning the same lesson twice.
+Skills tell the agent how to do something.  
+Experiences help the agent avoid repeating the same analysis.
 
-### 5. Configurable Tooling for Real Machines
+### 5. Tooling Built For Real Machines
 
-Built-in tools are aimed at actual work, not demos:
+Built-in tools are designed for actual work:
 - `bash`
 - `python`
 - `write_file`
@@ -83,103 +77,105 @@ Built-in tools are aimed at actual work, not demos:
 - `list_directory`
 - `get_skill`
 - `get_experience`
+- `send_image`
 
-Python is configurable from the UI and only injected into the model when the configured interpreter is actually available.
+Python is configurable from the UI and only exposed to the model when the configured interpreter is actually available.
 
-### 6. Works With OpenAI-Compatible APIs and Anthropic
+### 6. Image Delivery Is First-Class
 
-You can switch providers without rewriting the app:
-- OpenAI-compatible endpoints
-- Anthropic Claude
+Agents can send images back into the chat:
+- remote image URLs
+- local image files
+- base64 image payloads
 
-This makes it practical for local deployments, self-hosted gateways, and regional providers.
+Images are copied into the static `images/` directory, rendered in chat, and support:
+- click-to-open preview
+- drag
+- wheel zoom
+- pinch zoom on mobile
+- localized error fallback when loading fails
+
+### 7. Standalone Release Builds
+
+The app can be packaged without Electron:
+- frontend builds to static assets
+- backend is bundled and compiled into a standalone executable with `pkg`
+- target machines do not need Node.js or npm installed
 
 ## Core Features
 
 - Independent agent run per message
-- Live SSE streaming for text, thinking, tool calls, and results
+- Live SSE streaming and replay
 - Tool-using agent loop with file system access
 - Configurable Python execution tool
+- Image sending tool for agents
 - Skill system based on `SKILL.md`
 - Experience system with `get_experience`
 - Automatic experience summarization for idle conversations
-- Manual conversation summarization via `/summarize`
-- Persistent local conversation history
+- Manual summarization via `/summarize`
+- Settings-based enable/disable management for skills and experiences
+- Local conversation persistence
 - Light / dark / system theme UI
-- Structured logging
+- Structured logs
 - OpenAI-compatible and Anthropic provider support
+- Standalone `win-x64`, `linux-x64`, and `macos-x64` release builds
 
 ## Experience System
 
-This project now includes an **experience system** designed specifically for agent workflows.
+AsynAgents includes a built-in **experience system** for agent workflows.
 
-When a conversation becomes idle and the agent is no longer running, AsynAgents can summarize that conversation into a reusable experience note stored in:
+When a conversation becomes idle and no agent is running, the system can summarize that conversation into a reusable experience note stored in:
 
 ```text
 ~/.asynagents/experiences/
 ```
 
-Each experience is a Markdown file with metadata:
+Each experience is a Markdown file with metadata such as:
 - `title`
 - `summary`
 - `keywords`
 - `source_conversations`
 - `updated_at`
 
-The agent only sees the experience index in the system prompt.  
-If one looks relevant, it can call `get_experience` to read the full note.
+The agent only receives the experience index in the prompt.  
+If a note looks relevant, it calls `get_experience` to load the full content.
 
-This keeps prompts compact while still giving the model access to durable lessons from past work.
+## Built-In Tools
 
-## Architecture
+| Tool | Purpose |
+|------|---------|
+| `bash` | Execute shell commands |
+| `python` | Execute Python code with the configured interpreter |
+| `write_file` | Create or overwrite files |
+| `read_file` | Read file contents |
+| `list_directory` | Inspect directories |
+| `get_skill` | Read a skill's full `SKILL.md` |
+| `get_experience` | Read a saved experience note |
+| `send_image` | Send a remote, local, or base64 image into the chat |
 
-```text
-Frontend (React + Zustand + Vite)
-        |
-        | REST + SSE
-        v
-Express API
-        |
-        +-- /api/chat -> create one SubAgent per message
-        +-- /api/events/:conversationId -> stream + replay buffered events
-        +-- /api/conversations -> persist local chat history
-        +-- /api/config -> runtime config updates
-        |
-        v
-SubAgent Loop
-        |
-        +-- OpenAI-compatible provider
-        +-- Anthropic provider
-        +-- Tool execution
-        +-- Skills prompt injection
-        +-- Experiences prompt injection
-        |
-        v
-Local storage in ~/.asynagents/
+## Release Build
+
+Build a standalone executable for the current platform:
+
+```bash
+npm run build:release
 ```
 
-## Project Structure
+Build specific targets:
+
+```bash
+npm run build:release:win-x64
+npm run build:release:linux-x64
+npm run build:release:macos-x64
+```
+
+Example release layout:
 
 ```text
-asyn-agents/
-|-- app/                        # React frontend
-|   `-- src/
-|       |-- components/
-|       |-- hooks/
-|       |-- stores/
-|       `-- types/
-|-- server/                     # Express backend
-|   `-- src/
-|       |-- agent/              # SubAgent loop, tools, providers
-|       |-- experience/         # Experience storage, loader, scheduler, summarizer
-|       |-- queue/              # SSE replay buffer
-|       |-- routes/             # API routes
-|       |-- skills/             # Skill loader
-|       |-- storage/            # Conversation persistence
-|       `-- types/
-|-- skills/                     # Built-in skills
-|-- config.ts                   # Config schema and defaults
-`-- config.example.json         # Example runtime config
+release/win-x64/
+|-- asynagents-server.exe
+|-- public/
+`-- skills/
 ```
 
 ## Quick Start
@@ -194,7 +190,7 @@ cd ../app && npm install
 
 ### 2. Create Config
 
-The runtime config file lives here:
+Runtime config lives at:
 
 ```text
 ~/.asynagents/config.json
@@ -219,6 +215,10 @@ Example:
     "scanIntervalMs": 60000,
     "maxEntriesInPrompt": 50
   },
+  "server": {
+    "hostname": "127.0.0.1",
+    "port": 6868
+  },
   "openai": {
     "apiKey": "your-api-key",
     "baseUrl": "https://api.openai.com/v1",
@@ -227,12 +227,6 @@ Example:
   "anthropic": {
     "apiKey": "",
     "model": "claude-opus-4-6"
-  },
-  "server": {
-    "port": 6868
-  },
-  "app": {
-    "port": 2323
   }
 }
 ```
@@ -250,31 +244,45 @@ Open:
 http://localhost:2323
 ```
 
-## Built-In Tools
+## API Overview
 
-| Tool | Purpose |
-|------|---------|
-| `bash` | Execute shell commands |
-| `python` | Execute Python code with the configured interpreter |
-| `write_file` | Create or overwrite files |
-| `read_file` | Read file contents |
-| `list_directory` | Inspect directories |
-| `get_skill` | Read a skill's full `SKILL.md` |
-| `get_experience` | Read a saved experience note |
+### `POST /api/chat`
+
+Start a new agent run for one message.
+
+### `POST /api/chat/stop`
+
+Stop a running agent thread.
+
+### `GET /api/events/:conversationId`
+
+Subscribe to streamed conversation events.
+
+### `GET /api/conversations`
+
+List locally persisted conversations.
+
+### `POST /api/conversations/:id/summarize`
+
+Manually summarize a conversation into an experience note.
+
+### `GET /health`
+
+Return provider, model, config status, hostname, Python availability, and experience count.
 
 ## Skills
 
 Skills are instruction packs stored as `SKILL.md`.
 
-Example layout:
+Example:
 
 ```text
 skills/
 `-- my-skill/
-   `-- SKILL.md
+    `-- SKILL.md
 ```
 
-Minimal example:
+Minimal format:
 
 ```md
 ---
@@ -293,48 +301,12 @@ Load order:
 
 User skills override bundled skills with the same name.
 
-## API Overview
-
-### `POST /api/chat`
-
-Start a new agent run for one message.
-
-### `POST /api/chat/stop`
-
-Stop a running agent thread.
-
-### `GET /api/events/:conversationId`
-
-Subscribe to streamed events for a conversation.
-
-### `GET /api/conversations`
-
-List locally persisted conversations.
-
-### `POST /api/conversations/:id/summarize`
-
-Manually summarize a conversation into an experience note.
-
-### `GET /health`
-
-Return provider, model, config status, Python availability, and experience count.
-
 ## Development
 
 ```bash
 npm run test
 npm run build
 ```
-
-## Security
-
-This project can execute shell commands, write files, and run Python.  
-Treat it like a real agent runtime, not a harmless chatbot.
-
-Use it in:
-- a trusted local environment
-- a sandboxed machine
-- or a workspace you are comfortable letting an agent modify
 
 ## Tech Stack
 
@@ -343,17 +315,27 @@ Use it in:
 | Frontend | React 18, TypeScript, Vite, Less, Zustand |
 | Backend | Express, TypeScript, Winston |
 | AI Providers | OpenAI SDK, Anthropic SDK |
+| Packaging | esbuild, pkg |
 | Testing | Vitest, Supertest |
+
+## Security
+
+This project can execute shell commands, write files, run Python, and modify the local workspace.  
+Treat it like a real agent runtime, not a harmless chatbot.
+
+Use it in:
+- a trusted local environment
+- a sandboxed machine
+- or a workspace you are comfortable letting an agent modify
 
 ## Best Fit
 
 AsynAgents is a strong fit if you want:
 - an inspectable local agent app
 - a UI that exposes tool execution instead of hiding it
-- a project you can extend with custom tools, skills, and prompt layers
-- an agent runtime that accumulates reusable operational experience over time
-
-It is especially good for coding, local automation, and desktop task workflows.
+- a system that accumulates reusable skills and experiences
+- a release model without Electron
+- an agent runtime aimed at coding, automation, and desktop workflows
 
 ## License
 
